@@ -106,6 +106,14 @@ function createWorld(container, DATA, onSync, onHint){
     }
   }
   for(const w of DATA.walls)buildWall(w);
+  for(const wl of (DATA.wells||[])){
+    const x0=wl.a[0],z0=wl.a[1],x1=wl.b[0],z1=wl.b[1];
+    const bands=[[x0,z0,x1,z0],[x1,z0,x1,z1],[x1,z1,x0,z1],[x0,z1,x0,z0]];
+    for(const bd of bands){
+      const L2=Math.hypot(bd[2]-bd[0],bd[3]-bd[1]); if(L2<0.02)continue;
+      addBox((bd[0]+bd[2])/2,H/2,(bd[1]+bd[3])/2,W,H,L2,Math.atan2(bd[2]-bd[0],bd[3]-bd[1]),wallMat);
+    }
+  }
   for(const c of (DATA.columns||[])){
     const xs=c.pts.map(p=>p[0]),zs=c.pts.map(p=>p[1]);
     const cx=(Math.min(...xs)+Math.max(...xs))/2, cz=(Math.min(...zs)+Math.max(...zs))/2;
