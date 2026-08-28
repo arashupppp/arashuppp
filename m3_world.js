@@ -135,11 +135,36 @@ function createWorld(container, DATA, onSync, onHint){
       addRun(s.a,s.b,s.w||1,0,n1,Hs);
       addRun(s.b,s.c,s.w||1,n1,n-n1,Hs);
     } else if(s.type==='U'){
-      const L1=Math.hypot(s.b[0]-s.a[0],s.b[1]-s.a[1]);
-      const L2=Math.hypot(s.c[0]-s.b[0],s.c[1]-s.b[1]);
+      const L1=Math.hypot(s.b[0]-s.a[0],s.b[1]-s.a[1])||0.001;
+      const ux=(s.b[0]-s.a[0])/L1, uz=(s.b[1]-s.a[1])/L1;
+      const nx=-uz, nz=ux;
+      const lat=(s.c[0]-s.b[0])*nx+(s.c[1]-s.b[1])*nz;
+      const gap=Math.abs(lat)||s.w||1;
+      const sg=lat>=0?1:-1;
+      const s2=[s.b[0]+nx*gap*sg, s.b[1]+nz*gap*sg];
+      const L2=Math.hypot(s.c[0]-s2[0], s.c[1]-s2[1]);
       const n1=Math.max(1,Math.round(n*L1/(L1+L2)));
       addRun(s.a,s.b,s.w||1,0,n1,Hs);
-      addRun(s.c,s.b,s.w||1,n1,n-n1,Hs);
+      addRun(s2,s.c,s.w||1,n1,n-n1,Hs);
+    } else if(s.type==='J'){
+      const L1=Math.hypot(s.b[0]-s.a[0],s.b[1]-s.a[1])||0.001;
+      const L2=Math.hypot(s.c[0]-s.b[0],s.c[1]-s.b[1])||0.001;
+      const Lc=Math.min((s.w||1)*0.9, L1*0.4);
+      const b2=[s.b[0]-(s.b[0]-s.a[0])/L1*Lc, s.b[1]-(s.b[1]-s.a[1])/L1*Lc];
+      const c2=[s.b[0]+(s.c[0]-s.b[0])/L2*Math.min(Lc,L2*0.5), s.b[1]+(s.c[1]-s.b[1])/L2*Math.min(Lc,L2*0.5)];
+      const Lr1=Math.hypot(b2[0]-s.a[0], b2[1]-s.a[1]);
+      const Lr2=Math.hypot(s.c[0]-c2[0], s.c[1]-c2[1]);
+      const n1=Math.max(1,Math.round(n*Lr1/(Lr1+Lr2+Lc)));
+      addRun(s.a,b2,s.w||1,0,n1,Hs);
+      addRun(c2,s.c,s.w||1,n1,n-n1,Hs);
+      const topMid=Hs*(n1+0.5)/n;
+      const smat=new THREE.MeshStandardMaterial({color:0xb0b0b0,roughness:.75});
+      const hw=(s.w||1)/2;
+      const u1=[(s.b[0]-s.a[0])/L1,(s.b[1]-s.a[1])/L1];
+      const u2=[(s.c[0]-s.b[0])/L2,(s.c[1]-s.b[1])/L2];
+      const cx=(s.b[0]+ (s.b[0]+u2[0]*hw*0.5))/2, cz=(s.b[1]+(s.b[1]+u2[1]*hw*0.5))/2;
+      const ry=-Math.atan2(u2[1],u2[0]);
+      addBox(cx, topMid/2, cz, hw*2.2, topMid, hw*2.2, ry, smat);
     } else if(s.type==='spiral'){
       const R=s.r||0.9, turn=s.turn||1, nP=Math.max(10,Math.round(n*0.7));
       const sweep=Math.PI*1.75*turn;
