@@ -62,7 +62,6 @@
   </div>
   <button class="tool-btn" id="btnWell">☀️ نورباز</button>
   <button class="tool-btn" id="btnBalc">⬒ بالکن</button>
-  <button class="tool-btn" id="btnZone">⬚ ناحیه</button>
   <button class="tool-btn" id="btnRail">⌒ نرده</button>
   <div style="position:relative;display:inline-block">
     <button class="tool-btn" id="btnStair">🪜 پله ▾</button>
@@ -139,13 +138,12 @@ const cv=document.getElementById('cv'), ctx=cv.getContext('2d');
 
 const proj={ name:'پروژه بدون نام',
   plan:{src:null, anchorA:null, anchorB:null, meters:null},
-  walls:[], doors:[], columns:[], stairs:[], elevs:[], wells:[], balcs:[], rails:[], zones:[], nextId:1 };
+  walls:[], doors:[], columns:[], stairs:[], elevs:[], wells:[], balcs:[], rails:[], nextId:1 };
 let planImg=null, planScale=null; // متر بر پیکسل عکس
 let colPts=[];             // ۴ گوشهٔ ستون در حال کشیدن
 let stairPts=[];
 let wellPts=[];           // نورباز: ۲ کلیک (گوشه اول/گوشه مقابل)           // نقاط نصب پله (مستقیم=۱نقطه، L/U=۲نقطه)
 let balcPts=[];           // بالکن: گوشه‌های چندضلعی (≥۳) — Enter/dblclick بستن
-let zonePts=[];           // ناحیه: گوشه‌های چندضلعی (≥۳) — Enter/dblclick بستن
 let railPts=[];           // نرده: نقاط شکست polyline (≥۲) — راست‌کلیک پایان
 let spiralDir=1;           // جهت چرخش مارپیچ: +1 پادساعتگرد، -1 ساعتگرد
 let elevRot=0;             // چرخش پیش‌نمایش آسانسور (۹۰° پله‌ای)
@@ -199,7 +197,7 @@ function orthoLock(from, to){ // Shift: قفل افقی/عمودی
 }
 
 // ---------- Undo: استک واحد برای رسم/حذف/جابه‌جایی ----------
-function mkSnap(){ return JSON.stringify({walls:proj.walls,doors:proj.doors,columns:proj.columns,stairs:proj.stairs,elevs:proj.elevs,wells:proj.wells,balcs:proj.balcs,rails:proj.rails,zones:proj.zones,nextId:proj.nextId,planOff}); }
+function mkSnap(){ return JSON.stringify({walls:proj.walls,doors:proj.doors,columns:proj.columns,stairs:proj.stairs,elevs:proj.elevs,wells:proj.wells,balcs:proj.balcs,rails:proj.rails,nextId:proj.nextId,planOff}); }
 function pushUndo(){ undoStack.push(mkSnap());
   if(undoStack.length>60) undoStack.shift(); }
 function pushUndoRaw(origObj){ if(!origObj.planOff) origObj.planOff=planOff;
@@ -208,9 +206,9 @@ function pushUndoRaw(origObj){ if(!origObj.planOff) origObj.planOff=planOff;
 function pushUndoSnap(s){ undoStack.push(s);
   if(undoStack.length>60) undoStack.shift(); }
 function undo(){ const s=undoStack.pop(); if(!s) return flash('چیزی برای برگشت نیست');
-  const o=JSON.parse(s); proj.walls=o.walls; proj.doors=o.doors||[]; proj.columns=o.columns||[]; proj.stairs=o.stairs||[]; proj.elevs=o.elevs||[]; proj.wells=o.wells||[]; proj.balcs=o.balcs||[]; proj.rails=o.rails||[]; proj.zones=o.zones||[]; proj.nextId=o.nextId;
+  const o=JSON.parse(s); proj.walls=o.walls; proj.doors=o.doors||[]; proj.columns=o.columns||[]; proj.stairs=o.stairs||[]; proj.elevs=o.elevs||[]; proj.wells=o.wells||[]; proj.balcs=o.balcs||[]; proj.rails=o.rails||[]; proj.nextId=o.nextId;
   if(o.planOff) planOff={x:o.planOff.x,z:o.planOff.z};
-  if(selId && selId!=='__plan__' && !proj.walls.find(w=>w.id===selId) && !proj.doors.find(d=>d.id===selId) && !proj.stairs.find(s=>s.id===selId) && !proj.elevs.find(x=>x.id===selId) && !proj.balcs.find(b=>b.id===selId) && !proj.zones.find(z=>z.id===selId) && !proj.rails.find(r=>r.id===selId)) selId=null; refresh(); }
+  if(selId && selId!=='__plan__' && !proj.walls.find(w=>w.id===selId) && !proj.doors.find(d=>d.id===selId) && !proj.stairs.find(s=>s.id===selId) && !proj.elevs.find(x=>x.id===selId) && !proj.balcs.find(b=>b.id===selId) && !proj.rails.find(r=>r.id===selId)) selId=null; refresh(); }
 
 // ---------- ابزارها ----------
 function setTool(t){
@@ -225,14 +223,12 @@ function setTool(t){
   btnElev.classList.toggle('active',t==='elev');
   btnWell.classList.toggle('active',t==='well');
   btnBalc.classList.toggle('active',t==='balc');
-  btnZone.classList.toggle('active',t==='zone');
   btnRail.classList.toggle('active',t==='rail');
   if(t!=='column'){ colPts=[]; }
   if(t!=='stair'){ stairPts=[]; } else { stairType = stairType||'straight'; }
   if(t!=='elev'){ elevRot=0; }
   if(t!=='well'){ wellPts=[]; }
   if(t!=='balc'){ balcPts=[]; }
-  if(t!=='zone'){ zonePts=[]; }
   if(t!=='rail'){ railPts=[]; }
   cv.style.cursor = t==='select'?'default':'crosshair';
 projName.addEventListener('input',()=>{ proj.name=projName.value||'پروژه بدون نام'; refresh(); });
@@ -240,7 +236,7 @@ projName.addEventListener('input',()=>{ proj.name=projName.value||'پروژه ب
     wall:'کلیک اول: شروع دیوار', calib:'کلیک اول: سرِ فاصلهٔ معلوم',
     door:'کلیک روی یک دیوار: نصب درب', window:'کلیک روی یک دیوار: نصب پنجره',
     stair:'پله — نوع را از منوی «پله ▾» انتخاب کن (پیش‌فرض: مستقیم)',
-    elev:'آسانسور — کلیک: جای شفت؛ R: چرخش ۹۰°', well:'نورباز — کلیک ۱: گوشه اول، کلیک ۲: گوشه مقابل', balc:'بالکن — کلیک: گوشه جدید — Enter/dblclick: پایان (حداقل ۳)', zone:'ناحیه — کلیک: گوشه — Enter/dblclick: پایان (حداقل ۳)', rail:'نرده — کلیک: نقطه شکست — راست‌کلیک: پایان (حداقل ۲)'};
+    elev:'آسانسور — کلیک: جای شفت؛ R: چرخش ۹۰°', well:'نورباز — کلیک ۱: گوشه اول، کلیک ۲: گوشه مقابل', balc:'بالکن — کلیک: گوشه جدید — Enter/dblclick: پایان (حداقل ۳)', rail:'نرده — کلیک: نقطه شکست — راست‌کلیک: پایان (حداقل ۲)'};
   showHint(hints[t]);
 }
 
@@ -251,17 +247,6 @@ function finishBalc(){
   proj.balcs.push({id:nid, pts:balcPts.map(p=>p.slice())});
   selId=nid; balcPts=[];
   showHint('بالکن نصب شد ✓ — Del حذف، درگ جابجایی');
-  refresh();
-}
-function finishZone(){
-  if(zonePts.length<3){ showHint('حداقل ۳ گوشه لازم است'); zonePts=[]; refresh(); return; }
-  pushUndo();
-  const nid='lz'+(proj.nextId++);
-  const ZONE_COLORS=['#2288cc','#22aa66','#cc6622','#aa22aa','#22aaaa','#ccaa22'];
-  const color=ZONE_COLORS[proj.zones.length % ZONE_COLORS.length];
-  proj.zones.push({id:nid, pts:zonePts.map(p=>p.slice()), name:'ناحیه', color});
-  selId=nid; zonePts=[];
-  showHint('ناحیه نصب شد ✓ — Del حذف، درگ جابجایی، دابل‌کلیک: ویرایش');
   refresh();
 }
 function finishRail(){
@@ -507,14 +492,6 @@ cv.addEventListener('mousedown', e=>{
     showHint('گوشهٔ '+balcPts.length+' ثبت شد — Enter/dblclick: پایان (حداقل ۳)');
     refresh();
   }
-  else if(tool==='zone'){
-    const sp=snapPoint(w, e.altKey);
-    const prev=zonePts.length>0?zonePts[zonePts.length-1]:null;
-    const locked=prev&&shiftHeld?orthoLock(prev,sp):sp;
-    zonePts.push([locked.x, locked.z]);
-    showHint('گوشهٔ '+zonePts.length+' ثبت شد — Enter/dblclick: پایان (حداقل ۳)');
-    refresh();
-  }
   else if(tool==='rail'){
     const sp=snapPoint(w, e.altKey);
     const prev=railPts.length>0?railPts[railPts.length-1]:null;
@@ -541,9 +518,6 @@ cv.addEventListener('mousedown', e=>{
     else if((hit=pickBalcW(w))){ selId=hit.id;
       if(lockedIds.has(hit.id)){ dragInfo=null; }
       else dragInfo={type:'balc', start:w, orig:{pts:hit.pts.map(p=>[...p])}, origSnap:mkSnap(), moved:false}; }
-    else if((hit=pickZoneW(w))){ selId=hit.id;
-      if(lockedIds.has(hit.id)){ dragInfo=null; }
-      else dragInfo={type:'zone', start:w, orig:{pts:hit.pts.map(p=>[...p])}, origSnap:mkSnap(), moved:false}; }
     else if((hit=pickRailW(w))){ selId=hit.id;
       if(lockedIds.has(hit.id)){ dragInfo=null; }
       else dragInfo={type:'rail', start:w, orig:{pts:hit.pts.map(p=>[...p])}, origSnap:mkSnap(), moved:false}; }
@@ -637,13 +611,6 @@ else if(dragInfo&&dragInfo.type==='plan'){
     const npts=dragInfo.orig.pts.map(p=>[p[0]+dx, p[1]+dz]);
     if(JSON.stringify(npts)!==JSON.stringify(bc.pts)){ bc.pts=npts; dragInfo.moved=true; }
   }
-  if(dragInfo&&dragInfo.type==='zone'&&selId){
-    if(lockedIds.has(selId)){ dragInfo=null; return; }
-    const z=proj.zones.find(x=>x.id===selId); if(!z) return;
-    const dx=mouseWorld.x-dragInfo.start.x, dz=mouseWorld.z-dragInfo.start.z;
-    const npts=dragInfo.orig.pts.map(p=>[p[0]+dx, p[1]+dz]);
-    if(JSON.stringify(npts)!==JSON.stringify(z.pts)){ z.pts=npts; dragInfo.moved=true; }
-  }
   if(dragInfo&&dragInfo.type==='rail'&&selId){
     if(lockedIds.has(selId)){ dragInfo=null; return; }
     const rl=proj.rails.find(x=>x.id===selId); if(!rl) return;
@@ -669,9 +636,6 @@ cv.addEventListener('dblclick', e=>{
   const r0=cv.getBoundingClientRect(), sx0=e.clientX-r0.left, sy0=e.clientY-r0.top;
   const w0=S2W(sx0,sy0);
   if(tool==='balc'){ finishBalc(); return; }
-  if(tool==='zone'){ finishZone(); return; }
-  const z=pickZoneW(w0);
-  if(z){ openZoneEdit(z); return; }
   const st=pickStairW(w0);
   if(st){
     openStairEdit(st); return;
@@ -822,57 +786,6 @@ function openStairEdit(st){
   refreshStFields();
 }
 
-function openZoneEdit(z){
-  const p=document.createElement('div');
-  p.style.cssText='position:fixed;top:70px;left:50%;transform:translateX(-50%);z-index:60;background:#111;border:1px solid #00ffcc66;border-radius:12px;padding:14px 18px;color:#ddd;font-size:13px;box-shadow:0 10px 40px #000d;min-width:320px';
-  const SWATCHES=[
-    ['#2288cc','آبی'],['#22aa66','سبز'],['#cc6622','نارنجی'],
-    ['#aa22aa','بنفش'],['#22aaaa','فیروزه'],['#ccaa22','زرد']
-  ];
-  p.innerHTML='<b style="color:#00ffcc">ویرایش ناحیه</b><br><br>'+
-    '<div id="zFields" style="margin-bottom:12px">'+
-      '<label style="display:block;margin-bottom:8px">نام: <input id="zn" type="text" value="'+z.name+'" style="width:160px;background:#000;border:1px solid #345;color:#fff;padding:4px 8px;border-radius:6px;font-family:inherit"></label>'+
-      '<div style="margin-bottom:8px;color:#999;margin-top:4px">رنگ:</div>'+
-      '<div style="display:flex;gap:8px;flex-wrap:wrap">'+
-        SWATCHES.map(s=>'<button class="zsw" data-c="'+s[0]+'" style="width:36px;height:28px;border-radius:6px;border:2px solid '+(z.color===s[0]?'#fff':s[0]+'88')+';background:'+s[0]+';cursor:pointer" title="'+s[1]+'"></button>').join('')+
-      '</div>'+
-    '</div>'+
-    '<button id="zok" style="padding:7px 22px;border-radius:8px;border:1px solid #00ffcc;background:#00ffcc22;color:#00ffcc;cursor:pointer;font-family:inherit">تأیید</button> '+
-    '<button id="zdel" style="padding:7px 14px;border-radius:8px;border:1px solid #cc3333;background:#cc222222;color:#ff6666;cursor:pointer;font-family:inherit;margin-right:8px">حذف ناحیه</button> '+
-    '<button id="zcx" style="padding:7px 14px;border-radius:8px;border:1px solid #345;background:#1a1a1a;color:#999;cursor:pointer;font-family:inherit">بستن</button>';
-  document.body.appendChild(p);
-  // color swatches
-  p.querySelectorAll('.zsw').forEach(b=>{
-    b.onclick=()=>{
-      z.color=b.dataset.c;
-      p.querySelectorAll('.zsw').forEach(x=>x.style.borderColor=x.dataset.c+'88');
-      b.style.borderColor='#fff';
-      refresh();
-    };
-  });
-  // تأیید
-  p.querySelector('#zok').onclick=()=>{
-    const nm=p.querySelector('#zn').value.trim();
-    pushUndo();
-    if(nm) z.name=nm;
-    p.remove(); document.removeEventListener('keydown', escHandler);
-    refresh(); showHint('ناحیه به‌روز شد ✓');
-  };
-  // حذف
-  p.querySelector('#zdel').onclick=()=>{
-    pushUndo();
-    proj.zones=proj.zones.filter(x=>x.id!==z.id);
-    selId=null;
-    p.remove(); document.removeEventListener('keydown', escHandler);
-    refresh(); showHint('ناحیه حذف شد');
-  };
-  // بستن
-  p.querySelector('#zcx').onclick=()=>{ p.remove(); document.removeEventListener('keydown', escHandler); };
-  // Escape handler
-  const escHandler=(e)=>{ if(e.key==='Escape'){ p.remove(); document.removeEventListener('keydown', escHandler); } };
-  document.addEventListener('keydown', escHandler);
-}
-
 cv.addEventListener('wheel', e=>{ e.preventDefault();
   const f=e.deltaY<0?1.15:1/1.15, nz=Math.min(2000,Math.max(0.5,view.zoom*f));
   const k=nz/view.zoom;
@@ -884,13 +797,11 @@ function lastMouseOffset(e){ return {x:e.clientX-cv.getBoundingClientRect().left
 let shiftHeld=false, spaceHeld=false;
 window.addEventListener('keydown', e=>{
   const stPanelOpen=!!document.querySelector('#stFields');
-  const zonePanelOpen=!!document.querySelector('#zFields');
-  if((stPanelOpen||zonePanelOpen)&&e.key!=='Escape'){ if(e.key===' '||e.key.toLowerCase()==='r'||e.key.toLowerCase()==='f'||e.key==='Delete'||e.key==='Backspace') e.preventDefault(); return; }
+  if(stPanelOpen&&e.key!=='Escape'){ if(e.key===' '||e.key.toLowerCase()==='r'||e.key.toLowerCase()==='f'||e.key==='Delete'||e.key==='Backspace') e.preventDefault(); return; }
   if(e.target.tagName==='INPUT') return;
   shiftHeld=e.shiftKey; spaceHeld=(e.code==='Space'); if(spaceHeld) e.preventDefault();
-  if(e.key==='Escape'){ if(tool==='stair'&&stairPts.length){ stairPts=[]; showHint('نصب پله لغو شد'); } if(tool==='rail'&&railPts.length>=2){ finishRail(); return; } if(tool==='balc'&&balcPts.length>=3){ finishBalc(); return; } if(tool==='zone'&&zonePts.length>=3){ finishZone(); return; } setTool('select'); selId=null; refresh(); }
+  if(e.key==='Escape'){ if(tool==='stair'&&stairPts.length){ stairPts=[]; showHint('نصب پله لغو شد'); } if(tool==='rail'&&railPts.length>=2){ finishRail(); return; } if(tool==='balc'&&balcPts.length>=3){ finishBalc(); return; } setTool('select'); selId=null; refresh(); }
   if(e.key==='Enter'&&tool==='balc'){ e.preventDefault(); finishBalc(); }
-  if(e.key==='Enter'&&tool==='zone'){ e.preventDefault(); finishZone(); }
   if((e.key==='Delete')&&selId){
     if(lockedIds.has(selId)){ flash('این مورد قفل است — اول با Z بازش کن'); return; }
     pushUndo();
@@ -900,7 +811,6 @@ window.addEventListener('keydown', e=>{
     else if(proj.elevs.some(x=>x.id===selId)) proj.elevs=proj.elevs.filter(x=>x.id!==selId);
     else if(proj.wells.some(x=>x.id===selId)) proj.wells=proj.wells.filter(x=>x.id!==selId);
     else if(proj.balcs.some(x=>x.id===selId)) proj.balcs=proj.balcs.filter(x=>x.id!==selId);
-    else if(proj.zones.some(x=>x.id===selId)) proj.zones=proj.zones.filter(x=>x.id!==selId);
     else if(proj.rails.some(x=>x.id===selId)) proj.rails=proj.rails.filter(x=>x.id!==selId);
     else { proj.walls=proj.walls.filter(x=>x.id!==selId); proj.doors=proj.doors.filter(d=>d.wallId!==selId); }
     selId=null; refresh();
@@ -958,7 +868,7 @@ window.addEventListener('keydown', e=>{
   if(e.key==='1') setTool('select'); if(e.key==='2') setTool('wall');
   if(e.key==='6') setTool('column'); if(e.key==='3') setTool('calib');
   if(e.key==='4') setTool('door'); if(e.key==='5') setTool('window');
-  if(e.key==='7') setTool('balc'); if(e.key==='8') setTool('zone'); if(e.key==='9') setTool('rail');
+  if(e.key==='7') setTool('balc'); if(e.key==='8') setTool('rail');
 });
 window.addEventListener('keyup', e=>{ shiftHeld=e.shiftKey; if(e.code==='Space') spaceHeld=false; });
 cv.addEventListener('contextmenu', e=>e.preventDefault());
@@ -1025,7 +935,7 @@ window.addEventListener('resize', resize);
 
 function refresh(){
   ctx.fillStyle='#181818'; ctx.fillRect(0,0,cv.width,cv.height);
-  drawPlan(); drawGrid(); drawWalls(); drawWells(); drawZones(); drawBalcs(); drawRails(); drawColumns(); drawStairs(); drawElevs(); drawOpenings(); drawPreview(); drawAnchors();
+  drawPlan(); drawGrid(); drawWalls(); drawWells(); drawBalcs(); drawRails(); drawColumns(); drawStairs(); drawElevs(); drawOpenings(); drawPreview(); drawAnchors();
   stCount.textContent=faNum(proj.walls.length);
   stOpen.textContent=faNum(proj.doors.length);
   stScale.textContent=(planScale? (1/planScale).toFixed(1)+' px/m · ':'کالیبره نشده · ')+'زوم: '+view.zoom.toFixed(1)+' px/m';
@@ -1114,12 +1024,6 @@ function pickWellW(w){
 function pickBalcW(w){
   for(const bc of (proj.balcs||[])){
     if(pointInPoly([w.x,w.z], bc.pts)) return bc;
-  }
-  return null;
-}
-function pickZoneW(w){
-  for(const z of (proj.zones||[])){
-    if(pointInPoly([w.x,w.z], z.pts)) return z;
   }
   return null;
 }
@@ -1539,19 +1443,6 @@ function drawPreview(){
     for(const P of ptsW){ ctx.beginPath(); ctx.arc(P[0],P[1],4,0,7); ctx.stroke(); }
     ctx.setLineDash([]); ctx.restore();
   }
-  // ناحیه: پیش‌نمایش زنجیره
-  if(tool==='zone'&&zonePts.length){
-    const sp=snapPoint(mouseWorld, altNow());
-    const prev=zonePts[zonePts.length-1];
-    const locked=shiftHeld?orthoLock(prev,sp):sp;
-    const ptsW=zonePts.map(p=>W2S({x:p[0],z:p[1]})).concat([W2S(locked)]);
-    ctx.save(); ctx.setLineDash([5,4]); ctx.strokeStyle='#44cc88'; ctx.lineWidth=1.8;
-    ctx.beginPath();
-    ptsW.forEach((P,i)=> i? ctx.lineTo(P[0],P[1]) : ctx.moveTo(P[0],P[1]));
-    ctx.closePath(); ctx.stroke();
-    for(const P of ptsW){ ctx.beginPath(); ctx.arc(P[0],P[1],4,0,7); ctx.stroke(); }
-    ctx.setLineDash([]); ctx.restore();
-  }
   // نرده: پیش‌نمایش زنجیره
   if(tool==='rail'&&railPts.length){
     const sp=snapPoint(mouseWorld, altNow());
@@ -1602,44 +1493,6 @@ function drawWells(){
     // برچسب
     ctx.fillStyle='#7fd6ea'; ctx.font='10px Tahoma'; ctx.textAlign='center';
     ctx.fillText('حیاط نور', cx, cy+3);
-    ctx.restore();
-  }
-}
-function drawZones(){
-  for(const z of (proj.zones||[])){
-    const pts=z.pts.map(p=>W2S({x:p[0],z:p[1]}));
-    const sel=z.id===selId, lock=lockedIds.has(z.id);
-    ctx.save();
-    ctx.globalAlpha=ghostMode&&!sel?0.28:1;
-    // fill
-    ctx.fillStyle=lock?z.color+'33':(sel?z.color+'55':z.color+'1e');
-    ctx.beginPath();
-    pts.forEach((P,i)=> i? ctx.lineTo(P[0],P[1]) : ctx.moveTo(P[0],P[1]));
-    ctx.closePath(); ctx.fill();
-    // border 2px
-    ctx.strokeStyle=lock?'#ff9f43':(sel?'#00ffcc':z.color);
-    ctx.lineWidth=2;
-    ctx.beginPath();
-    pts.forEach((P,i)=> i? ctx.lineTo(P[0],P[1]) : ctx.moveTo(P[0],P[1]));
-    ctx.closePath(); ctx.stroke();
-    // centroid label: name + area
-    let cx=0,cy=0; pts.forEach(p=>{cx+=p[0];cy+=p[1];});
-    cx/=pts.length; cy/=pts.length;
-    // area = shoelace / 2 (meters²)
-    let area=0;
-    const wPts=z.pts;
-    for(let i=0;i<wPts.length;i++){
-      const j=(i+1)%wPts.length;
-      area+=wPts[i][0]*wPts[j][1]-wPts[j][0]*wPts[i][1];
-    }
-    area=Math.abs(area)/2;
-    ctx.fillStyle=sel?'#00ffcc':'#e8f5e9';
-    ctx.font='bold 11px Tahoma';
-    ctx.textAlign='center';
-    ctx.fillText(z.name||'ناحیه', cx, cy-4);
-    ctx.font='10px Tahoma';
-    ctx.fillStyle=sel?'#00ffccaa':'#a5d6a7';
-    ctx.fillText(faNum(area.toFixed(1))+' m²', cx, cy+9);
     ctx.restore();
   }
 }
@@ -1849,7 +1702,6 @@ btnWall.onclick=()=>setTool('wall');
 btnColumn.onclick=()=>setTool('column');
 btnWell.onclick=()=>setTool('well');
 btnBalc.onclick=()=>setTool('balc');
-btnZone.onclick=()=>setTool('zone');
 btnRail.onclick=()=>setTool('rail');
 btn3D.onclick=()=>enter3D();
 
@@ -2012,7 +1864,7 @@ btnSave.onclick=()=>{
   const out={format:'hovi',version:1,name:proj.name,units:'m',
     wallHeight:WALL_H,wallThickness:WALL_T,
     plan:{src:proj.plan.src, anchorA:strip(proj.plan.anchorA), anchorB:strip(proj.plan.anchorB), meters:proj.plan.meters},
-    walls:proj.walls, doors:proj.doors, columns:proj.columns, stairs:proj.stairs, elevs:proj.elevs, wells:proj.wells||[], balcs:proj.balcs||[], rails:proj.rails||[], zones:proj.zones||[], nextId:proj.nextId};
+    walls:proj.walls, doors:proj.doors, columns:proj.columns, stairs:proj.stairs, elevs:proj.elevs, wells:proj.wells||[], balcs:proj.balcs||[], rails:proj.rails||[], nextId:proj.nextId};
   const blob=new Blob([JSON.stringify(out,null,1)],{type:'application/json'});
   const a=document.createElement('a');
   a.href=URL.createObjectURL(blob);
@@ -2030,7 +1882,7 @@ fileJson.onchange=e=>{
     try{
       const o=JSON.parse(rd.result);
       if(o.format!=='hovi') throw 0;
-      proj.walls=o.walls||[]; proj.doors=o.doors||[]; proj.columns=o.columns||[]; proj.stairs=o.stairs||[]; proj.elevs=o.elevs||[]; proj.wells=o.wells||[]; proj.balcs=o.balcs||[]; proj.rails=o.rails||[]; proj.zones=o.zones||[];
+      proj.walls=o.walls||[]; proj.doors=o.doors||[]; proj.columns=o.columns||[]; proj.stairs=o.stairs||[]; proj.elevs=o.elevs||[]; proj.wells=o.wells||[]; proj.balcs=o.balcs||[]; proj.rails=o.rails||[];
       proj.nextId=o.nextId||(proj.walls.length+1);
       proj.plan=o.plan||proj.plan;
       projName.value=o.name||'';
@@ -2055,7 +1907,7 @@ window.hovi={
   addElev(x,z,rot){ proj.elevs.push({id:'e'+(proj.nextId++),x,z,rot:rot||0}); refresh(); },
   calibrate(meters,dpx){ planScale=meters/dpx; },
   get scale(){return planScale;},
-  serialize(){ return JSON.stringify({format:'hovi',version:1,walls:proj.walls,doors:proj.doors,columns:proj.columns,stairs:proj.stairs,elevs:proj.elevs,wells:proj.wells||[],balcs:proj.balcs||[],rails:proj.rails||[],zones:proj.zones||[]}); },
+  serialize(){ return JSON.stringify({format:'hovi',version:1,walls:proj.walls,doors:proj.doors,columns:proj.columns,stairs:proj.stairs,elevs:proj.elevs,wells:proj.wells||[],balcs:proj.balcs||[],rails:proj.rails||[]}); },
   dbg(){ return {selId, plan:!!planImg, off:planOff, locked:[...lockedIds]}; },
   undoCount(){return undoStack.length;}
 };
@@ -2078,7 +1930,7 @@ setTool('select');
 
 /* ================= حالت ۳د (v20) ================= */
 let mode3d=false, W3=null;
-const M3_WORLD_SRC="const THREE=window.THREE3;\n/* HOVI 3D world \u2014 v20 (\u0628\u0627\u0632\u0646\u0648\u06cc\u0633\u06cc \u0627\u0628\u0632\u0627\u0631\u0647\u0627\u06cc \u0633\u0627\u062e\u062a \u0627\u0632 wcfix-v2 \u0631\u0648\u06cc \u062f\u0627\u062f\u0647\u0654 HOVI) */\nfunction createWorld(container, DATA, onSync, onHint){\n  const H=2.8, W=0.2, EYE=1.6, WALK=2.6, RUN=1.8;\n  const scene=new THREE.Scene(); scene.background=new THREE.Color(0x87ceeb);\n  const camera=new THREE.PerspectiveCamera(70,innerWidth/innerHeight,0.05,200);\n  camera.position.set(1,EYE,1);\n  const renderer=new THREE.WebGLRenderer({antialias:true});\n  renderer.setSize(innerWidth,innerHeight);\n  renderer.shadowMap.enabled=true; renderer.shadowMap.type=THREE.PCFSoftShadowMap;\n  renderer.outputColorSpace=THREE.SRGBColorSpace; renderer.toneMapping=THREE.ACESFilmicToneMapping;\n  container.appendChild(renderer.domElement);\n\n  const amb=new THREE.AmbientLight(0xffffff,.55); scene.add(amb);\n  const hemi=new THREE.HemisphereLight(0xbfd8ff,0x8a7a66,.45); scene.add(hemi);\n  const sun=new THREE.DirectionalLight(0xffeecc,1.4); sun.castShadow=true;\n  sun.shadow.mapSize.set(2048,2048);\n  Object.assign(sun.shadow.camera,{left:-20,right:20,top:20,bottom:-20,near:.5,far:80});\n  scene.add(sun);\n\n  // ==== \u062e\u0648\u0631\u0634\u06cc\u062f (\u06f0\u2013\u06f2\u06f4 \u0645\u062b\u0644 \u062a\u0648\u0631 HOVI) ====\n  let tod=12;\n  function updateSun(){\n    const t=(tod%24)/24, ang=(t-0.25)*Math.PI*2, sh=Math.sin(ang);\n    const skyMix=THREE.MathUtils.clamp((sh+0.3)/1.3,0,1);\n    scene.background=new THREE.Color(0x080820).lerp(new THREE.Color(0x87ceeb),skyMix);\n    sun.position.set(40*Math.cos(ang),40*Math.max(0.1,sh),40*Math.sin(ang));\n    sun.intensity=THREE.MathUtils.clamp(sh*1.3,0.15,1.4);\n    amb.intensity=THREE.MathUtils.clamp(0.2+sh*0.6,0.12,0.75);\n    hemi.intensity=0.12+skyMix*0.38;\n  }\n  updateSun();\n  const setTOD=v=>{tod=v;updateSun();};\n\n  // ==== \u0632\u0645\u06cc\u0646 ====\n  let bx0=1e9,bx1=-1e9,bz0=1e9,bz1=-1e9;\n  for(const w of DATA.walls){bx0=Math.min(bx0,w.a[0],w.b[0]);bx1=Math.max(bx1,w.a[0],w.b[0]);bz0=Math.min(bz0,w.a[1],w.b[1]);bz1=Math.max(bz1,w.a[1],w.b[1]);}\n  if(!DATA.walls.length){bx0=-5;bx1=5;bz0=-5;bz1=5;}\n  const fx=(bx0+bx1)/2,fz=(bz0+bz1)/2;\n  const floor=new THREE.Mesh(new THREE.PlaneGeometry(bx1-bx0+6,bz1-bz0+6),new THREE.MeshStandardMaterial({color:0xdad5cc,roughness:.95}));\n  floor.rotation.x=-Math.PI/2; floor.position.set(fx,0,fz); floor.receiveShadow=true; scene.add(floor);\n\n  const wallMat=new THREE.MeshStandardMaterial({color:0xd8d2c8,roughness:.75});\n  const doorMat=new THREE.MeshStandardMaterial({color:0x8a6b46,roughness:.6});\n  const ghostMat=new THREE.MeshBasicMaterial({color:0x00ffcc,transparent:true,opacity:.35});\n  const collid=[], interact=[];\n\n  function addBox(x,y,z,lx,ly,lz,ry,mat,solid=true){\n    const m=new THREE.Mesh(new THREE.BoxGeometry(lx,ly,lz),mat);\n    m.position.set(x,y,z); if(ry)m.rotation.y=ry;\n    m.castShadow=true; m.receiveShadow=true; scene.add(m);\n    if(solid)collid.push(m);\n    return m;\n  }\n  // ==== \u062f\u06cc\u0648\u0627\u0631\u0647\u0627\u06cc \u062f\u0627\u062f\u0647 \u0628\u0627 \u06af\u067e \u062f\u0631\u0628\u200c\u0647\u0627 ====\n  function buildWall(w){\n    const ax=w.a[0],az=w.a[1],bx=w.b[0],bz=w.b[1];\n    const L=Math.hypot(bx-ax,bz-az); if(L<0.01)return;\n    const on=Math.atan2(bx-ax,bz-az), ux=(bx-ax)/L, uz=(bz-az)/L;\n    const cuts=[0,1];\n    for(const o of (DATA.doors||[])) if(o.wallId===w.id) cuts.push(o.t/L-o.w/2/L, o.t/L+o.w/2/L);\n    cuts.sort((a,b)=>a-b);\n    for(let i=0;i<cuts.length-1;i++){\n      const s0=Math.max(0,cuts[i]), s1=Math.min(1,cuts[i+1]);\n      if(s1-s0<0.02)continue;\n      const p1x=ax+(bx-ax)*s0,p1z=az+(bz-az)*s0,p2x=ax+(bx-ax)*s1,p2z=az+(bz-az)*s1;\n      addBox((p1x+p2x)/2,H/2,(p1z+p2z)/2,W,H,Math.hypot(p2x-p1x,p2z-p1z),on,wallMat);\n    }\n    // \u062f\u0631\u0628\u200c\u0647\u0627\u06cc \u0645\u0648\u062c\u0648\u062f: \u0642\u0627\u0628 + \u0644\u0646\u06af\u0647\u0654 \u0627\u0646\u06cc\u0645\u06cc\u0634\u0646\u06cc\n    for(const o of (DATA.doors||[])){\n      if(o.wallId!==w.id)continue;\n      const c=o.t/L, cx=ax+(bx-ax)*c, cz=az+(bz-az)*c, ow=o.w;\n      if(o.type==='open'){ continue; } // \u0628\u0627\u0632\u0634\u0648\u06cc \u0628\u062f\u0648\u0646 \u062f\u0631\u0628: \u0647\u06cc\u0686\n      if(o.type==='slide'){\n        // \u06a9\u0634\u0648\u06cc\u06cc: \u0644\u0646\u06af\u0647\u0654 \u062b\u0627\u0628\u062a \u0633\u0631\u062a\u0627\u0633\u0631\u06cc \u062f\u0627\u062e\u0644 \u062f\u06cc\u0648\u0627\u0631\n        const leafS=new THREE.Mesh(new THREE.BoxGeometry(ow,2.1,0.05),doorMat);\n        leafS.position.set(cx,1.05,cz); leafS.rotation.y=on; leafS.castShadow=true;\n        scene.add(leafS); continue;\n      }\n      addBox(cx-ux*ow/2,H/2,cz-uz*ow/2,W/2,H,0.06,on,wallMat);\n      addBox(cx+ux*ow/2,H/2,cz+uz*ow/2,W/2,H,0.06,on,wallMat);\n      addBox(cx,H-0.05,cz,W/2,H,0.06,on,wallMat);\n      const halfW=(o.type==='double')?ow/2:ow;\n      const hingeSign=(o.hinge||1), swingSign=(o.swing||1);\n      const leaf2=new THREE.Mesh(new THREE.BoxGeometry(halfW,2.1,0.05),doorMat);\n      const pivot=new THREE.Group();\n      if(o.type==='double'){\n        // \u062f\u0648\u0644\u0646\u06af\u0647: \u062f\u0648 pivot \u0642\u0631\u06cc\u0646\u0647\n        const pivA=new THREE.Group(); pivA.position.set(cx-ux*ow/2,0,cz-uz*ow/2);\n        const la=new THREE.Mesh(new THREE.BoxGeometry(halfW,2.1,0.05),doorMat);\n        la.position.set(ux*halfW/2,1.05,0); la.castShadow=true;\n        pivA.add(la); pivA.rotation.y=on; scene.add(pivA);\n        pivA.userData={open:false,targetRot:on}; interact.push(pivA);\n        const pivB=new THREE.Group(); pivB.position.set(cx+ux*ow/2,0,cz+uz*ow/2);\n        const lb=la.clone(); lb.position.set(-ux*halfW/2,1.05,0);\n        pivB.add(lb); pivB.rotation.y=on; scene.add(pivB);\n        pivB.userData={open:false,targetRot:-on}; interact.push(pivB);\n      } else {\n        // \u062a\u06a9\u200c\u0644\u0646\u06af\u0647: \u0644\u0648\u0644\u0627 \u0633\u0645\u062a hinge\u060c \u0628\u0627\u0632\u0634\u0648 \u0628\u0647 \u0633\u0645\u062a swing\n        pivot.position.set(cx-ux*ow/2*hingeSign,0,cz-uz*ow/2*hingeSign);\n        leaf2.position.set(ux*ow/2*hingeSign,1.05,0); leaf2.castShadow=true;\n        pivot.add(leaf2); pivot.rotation.y=on; scene.add(pivot);\n        pivot.userData={open:false,targetRot:on*swingSign};\n        interact.push(pivot);\n      }\n    }\n  }\n  for(const w of DATA.walls)buildWall(w);\n  for(const wl of (DATA.wells||[])){\n    const x0=wl.a[0],z0=wl.a[1],x1=wl.b[0],z1=wl.b[1];\n    const bands=[[x0,z0,x1,z0],[x1,z0,x1,z1],[x1,z1,x0,z1],[x0,z1,x0,z0]];\n    for(const bd of bands){\n      const L2=Math.hypot(bd[2]-bd[0],bd[3]-bd[1]); if(L2<0.02)continue;\n      addBox((bd[0]+bd[2])/2,H/2,(bd[1]+bd[3])/2,W,H,L2,Math.atan2(bd[2]-bd[0],bd[3]-bd[1]),wallMat);\n    }\n  }\n  for(const c of (DATA.columns||[])){\n    const xs=c.pts.map(p=>p[0]),zs=c.pts.map(p=>p[1]);\n    const cx=(Math.min(...xs)+Math.max(...xs))/2, cz=(Math.min(...zs)+Math.max(...zs))/2;\n    const lw=Math.max(...xs)-Math.min(...xs), ld=Math.max(...zs)-Math.min(...zs);\n    addBox(cx,H/2,cz,lw,H,ld,0,new THREE.MeshStandardMaterial({color:0x9a9a9a,roughness:.8}));\n  }\n    const addRun=(a,b,w,i0,n,Hs)=>{\n    const ax=a[0],az=a[1],bx=b[0],bz=b[1];\n    const dx=bx-ax,dz=bz-az,L=Math.hypot(dx,dz);\n    if(!(L>0.05))return;\n    const ry=Math.atan2(-(dz),dx);\n    const tread=L/n, rise=Hs/n;\n    const smat=new THREE.MeshStandardMaterial({color:0xb0b0b0,roughness:.75});\n    for(let i=0;i<n;i++){\n      const cx=ax+dx*(i+0.5)/n, cz=az+dz*(i+0.5)/n, top=Hs*(i0+i+1)/Math.max(1,n);\n      addBox(cx,top/2,cz,tread,top,w,ry,smat);\n    }\n  };\n  for(const s of (DATA.stairs||[])){\n    const Hs=s.h||2.8, n=Math.max(2,Math.round(Hs/0.18));\n    if(s.type==='straight'){\n      addRun(s.a,s.b,s.w||1,0,n,Hs);\n    } else if(s.type==='L'){\n      const L1=Math.hypot(s.b[0]-s.a[0],s.b[1]-s.a[1]);\n      const L2=Math.hypot(s.c[0]-s.b[0],s.c[1]-s.b[1]);\n      const n1=Math.max(1,Math.round(n*L1/(L1+L2)));\n      addRun(s.a,s.b,s.w||1,0,n1,Hs);\n      addRun(s.b,s.c,s.w||1,n1,n-n1,Hs);\n    } else if(s.type==='U'){\n      const L1=Math.hypot(s.b[0]-s.a[0],s.b[1]-s.a[1])||0.001;\n      const ux=(s.b[0]-s.a[0])/L1, uz=(s.b[1]-s.a[1])/L1;\n      const nx=-uz, nz=ux;\n      const lat=(s.c[0]-s.b[0])*nx+(s.c[1]-s.b[1])*nz;\n      const gap=Math.abs(lat)||s.w||1;\n      const sg=lat>=0?1:-1;\n      const s2=[s.b[0]+nx*gap*sg, s.b[1]+nz*gap*sg];\n      const L2=Math.hypot(s.c[0]-s2[0], s.c[1]-s2[1]);\n      const n1=Math.max(1,Math.round(n*L1/(L1+L2)));\n      addRun(s.a,s.b,s.w||1,0,n1,Hs);\n      addRun(s2,s.c,s.w||1,n1,n-n1,Hs);\n    } else if(s.type==='J'){\n      const L1=Math.hypot(s.b[0]-s.a[0],s.b[1]-s.a[1])||0.001;\n      const L2=Math.hypot(s.c[0]-s.b[0],s.c[1]-s.b[1])||0.001;\n      const Lc=Math.min((s.w||1)*0.9, L1*0.4);\n      const b2=[s.b[0]-(s.b[0]-s.a[0])/L1*Lc, s.b[1]-(s.b[1]-s.a[1])/L1*Lc];\n      const c2=[s.b[0]+(s.c[0]-s.b[0])/L2*Math.min(Lc,L2*0.5), s.b[1]+(s.c[1]-s.b[1])/L2*Math.min(Lc,L2*0.5)];\n      const Lr1=Math.hypot(b2[0]-s.a[0], b2[1]-s.a[1]);\n      const Lr2=Math.hypot(s.c[0]-c2[0], s.c[1]-c2[1]);\n      const n1=Math.max(1,Math.round(n*Lr1/(Lr1+Lr2+Lc)));\n      addRun(s.a,b2,s.w||1,0,n1,Hs);\n      addRun(c2,s.c,s.w||1,n1,n-n1,Hs);\n      const topMid=Hs*(n1+0.5)/n;\n      const smat=new THREE.MeshStandardMaterial({color:0xb0b0b0,roughness:.75});\n      const hw=(s.w||1)/2;\n      const u1=[(s.b[0]-s.a[0])/L1,(s.b[1]-s.a[1])/L1];\n      const u2=[(s.c[0]-s.b[0])/L2,(s.c[1]-s.b[1])/L2];\n      const cx=(s.b[0]+ (s.b[0]+u2[0]*hw*0.5))/2, cz=(s.b[1]+(s.b[1]+u2[1]*hw*0.5))/2;\n      const ry=-Math.atan2(u2[1],u2[0]);\n      addBox(cx, topMid/2, cz, hw*2.2, topMid, hw*2.2, ry, smat);\n    } else if(s.type==='spiral'){\n      const R=s.r||0.9, turn=s.turn||1, nP=Math.max(10,Math.round(n*0.7));\n      const sweep=Math.PI*1.75*turn;\n      const smat=new THREE.MeshStandardMaterial({color:0xb0b0b0,roughness:.75});\n      const rIn=R*0.18, rMid=(R+rIn)/2, span=R-rIn;\n      for(let i=0;i<nP;i++){\n        const a0=sweep*i/nP, a1=sweep*(i+1)/nP, top=Hs*(i+1)/nP;\n        const am=(a0+a1)/2;\n        const cx=s.a[0]+rMid*Math.cos(am), cz=s.a[1]+rMid*Math.sin(am);\n        addBox(cx,top/2,cz,span*0.95, top, span*0.4, -am+(turn>0?Math.PI/2:-Math.PI/2), smat);\n      }\n    }\n  }\n  for(const ev of (DATA.elevs||[])){\n    const EW=ev.w||1.6, ED=ev.d||1.7;\n    addBox(ev.x,H/2,ev.z,ED,H,EW,(ev.rot||0),new THREE.MeshStandardMaterial({color:0x8a8f94,roughness:.6}));\n  }\n  // \u0628\u0627\u0644\u06a9\u0646: \u06a9\u0641 + \u0646\u0631\u062f\u0647 \u062f\u0648\u0631 \u0647\u0631 \u0636\u0644\u0639\n  const balcMat=new THREE.MeshStandardMaterial({color:0xc9b88a,roughness:.85});\n  const railMat=new THREE.MeshStandardMaterial({color:0x2a2e34,roughness:.6,metalness:.55});\n  const railMidMat=new THREE.MeshStandardMaterial({color:0x2a2e34,roughness:.6,metalness:.55});\n  function buildRail(pts, hTotal){\n    const postR=0.02;\n    const railH=0.05, railW=0.06, midH=0.5;\n    for(let i=0;i<pts.length-1;i++){\n      const ax=pts[i][0], az=pts[i][1], bx=pts[i+1][0], bz=pts[i+1][1];\n      const dx=bx-ax, dz=bz-az, L=Math.hypot(dx,dz); if(L<0.02)continue;\n      const ux=dx/L, uz=dz/L;\n      const on=Math.atan2(dx,dz);\n      addBox((ax+bx)/2, hTotal-railH/2, (az+bz)/2, L, railH, railW, on, railMat, false);\n      addBox((ax+bx)/2, midH/2, (az+bz)/2, L, 0.02, 0.02, on, railMidMat, false);\n      const step=1.2;\n      const nPosts=Math.max(2, Math.ceil(L/step)+1);\n      for(let k=0;k<nPosts;k++){\n        const t=k/(nPosts-1);\n        const px=ax+ux*L*t, pz=az+uz*L*t;\n        const pm=new THREE.Mesh(new THREE.CylinderGeometry(postR,postR,hTotal,8),railMat);\n        pm.position.set(px, hTotal/2, pz); pm.castShadow=true; pm.receiveShadow=true;\n        scene.add(pm);\n      }\n    }\n  }\n  for(const bc of (DATA.balcs||[])){\n    const pts=bc.pts;\n    if(!pts||pts.length<3) continue;\n    const shape=new THREE.Shape();\n    shape.moveTo(pts[0][0], pts[0][1]);\n    for(let i=1;i<pts.length;i++) shape.lineTo(pts[i][0], pts[i][1]);\n    shape.closePath();\n    const floorGeo=new THREE.ExtrudeGeometry(shape, {depth:0.12, bevelEnabled:false});\n    const floor=new THREE.Mesh(floorGeo, balcMat);\n    floor.rotation.x=-Math.PI/2;\n    floor.position.y=0.06;\n    floor.receiveShadow=true; floor.castShadow=true;\n    scene.add(floor);\n    const ring=pts.concat([pts[0]]);\n    buildRail(ring, 1.0);\n  }\n    // \u0646\u0627\u062d\u06cc\u0647: \u06a9\u0641 \u0631\u0646\u06af\u06cc \u0646\u06cc\u0645\u0647\u200c\u0634\u0641\u0627\u0641\n  const zoneMat=new THREE.MeshStandardMaterial({color:0x4d9de0,transparent:true,opacity:0.35,side:THREE.DoubleSide});\n  for(const z of (DATA.zones||[])){\n    const pts=z.pts; if(!pts||pts.length<3) continue;\n    const cx=pts.reduce((s,p)=>s+p[0],0)/pts.length, cz2=pts.reduce((s,p)=>s+p[1],0)/pts.length;\n    for(let i=1;i<pts.length-1;i++){\n      const shape=new THREE.Shape();\n      shape.moveTo(pts[0][0],pts[0][1]);\n      shape.lineTo(pts[i][0],pts[i][1]);\n      shape.lineTo(pts[i+1][0],pts[i+1][1]);\n      shape.closePath();\n      const geo=new THREE.ShapeGeometry(shape);\n      const mesh=new THREE.Mesh(geo,zoneMat);\n      mesh.rotation.x=-Math.PI/2;\n      mesh.position.set(0,0.01,0);\n      mesh.receiveShadow=false;\n      scene.add(mesh);\n    }\n  }\n\nfor(const rl of (DATA.rails||[])){\n    if(!rl.pts||rl.pts.length<2) continue;\n    buildRail(rl.pts, 1.0);\n  }\n\n  // ==== \u06a9\u0646\u062a\u0631\u0644 ====\n  // \u06a9\u0646\u062a\u0631\u0644 \u062f\u0633\u062a\u06cc: pointer lock + yaw/pitch (\u0628\u062f\u0648\u0646 PLC \u2014 \u0633\u0627\u0632\u06af\u0627\u0631 \u0628\u0627 file://)\n  const controls={isLocked:false};\n  const keys={}; const euler={y:0,x:0};\n  const dom=renderer.domElement;\n  dom.addEventListener('click',()=>{ if(!controls.isLocked) dom.requestPointerLock(); });\n  const plc=()=>controls.isLocked=!!document.pointerLockElement;\n  document.addEventListener('pointerlockchange',plc);\n  const mmove=e=>{ if(!controls.isLocked)return;\n    euler.y-=e.movementX*0.0022; euler.x-=e.movementY*0.0022;\n    euler.x=Math.max(-1.55,Math.min(1.55,euler.x));\n    camera.rotation.set(euler.x,euler.y,0,'YXZ');\n  };\n  addEventListener('mousemove',mmove);\n  const kd=e=>{keys[e.code]=true;\n    if(e.code==='KeyF'&&controls.isLocked)toggleDoor();\n  };\n  const ku=e=>{keys[e.code]=false;};\n  addEventListener('keydown',kd); addEventListener('keyup',ku);\n\n  function toggleDoor(){\n    const ray=new THREE.Raycaster();\n    ray.setFromCamera(new THREE.Vector2(0,0),camera);\n    const hits=ray.intersectObjects(interact,true);\n    if(hits.length&&hits[0].distance<4){\n      let g=hits[0].object; while(g&&!g.userData.targetRot!==undefined&&g.parent)g=g.parent;\n      if(g.userData){g.userData.open=!g.userData.open;\n        g.userData.targetRot=g.userData.open?g.userData.baseRot!==undefined?g.userData.baseRot-Math.PI/2:((g.rotation.y||0)-Math.PI/2):(g.userData.baseRot??g.rotation.y);\n        if(g.userData.baseRot===undefined)g.userData.baseRot=g.userData.open?g.userData.targetRot+Math.PI/2:g.userData.targetRot;\n      }\n    }\n  }\n  // \u0633\u0627\u062f\u0647\u200c\u0633\u0627\u0632\u06cc: \u062f\u0631\u0628 \u0646\u0632\u062f\u06cc\u06a9 \u00d7 \u062f\u0648\u0631\u0627\u0646 \u0646\u0631\u0645\n  const animated=[];\n  for(const p of interact)animated.push(p);\n\n  // ==== \u0627\u0628\u0632\u0627\u0631 \u0633\u0627\u062e\u062a (\u0628\u0627\u0632\u0646\u0648\u06cc\u0633\u06cc wcfix) ====\n  let tool='none', buildStep=0, startP=null;\n  const ghost=new THREE.Mesh(new THREE.BoxGeometry(1,0.2,0.1),ghostMat);\n  ghost.visible=false; scene.add(ghost);\n  const SPRAY=[0xff4444,0x44ff44,0x4488ff,0xffee44,0xff44ff,0x44ffff,0xffffff,0x222222];\n  let sprayIdx=0;\n  function setTool(t){\n    tool=t; buildStep=0; startP=null; ghost.visible=false;\n    document.querySelectorAll('.m3t').forEach(b=>{\n      const on=b.dataset.t===t;\n      b.style.background=on?'#ffcc00':'#333';\n      b.style.color=on?'#000':'#ccc';\n    });\n    onHint(t==='wall'?'\u062f\u06cc\u0648\u0627\u0631: \u06f2 \u06a9\u0644\u06cc\u06a9 \u2014 \u0631\u0627\u0633\u062a\u200c\u06a9\u0644\u06cc\u06a9 \u0644\u063a\u0648':\n           t==='door'?'\u062f\u0631\u0628: \u06a9\u0644\u06cc\u06a9 \u0631\u0648\u06cc \u062f\u06cc\u0648\u0627\u0631 (\u0622\u0647\u0646\u0631\u0628\u0627)':\n           t==='spray'?'\u0627\u0633\u067e\u0631\u06cc: \u0646\u06af\u0647\u200c\u062f\u0627\u0631 \u0648 \u0628\u06a9\u0634 \u2014 Q \u0631\u0646\u06af \u0628\u0639\u062f\u06cc':'\u0646\u06af\u0627\u0647 \u0622\u0632\u0627\u062f');\n  }\n  document.querySelectorAll('.m3t').forEach(b=>b.onclick=()=>setTool(b.dataset.t));\n\n  // \u0627\u0633\u067e\u0631\u06cc\n  let spraying=false;\n  const sprayTex=(()=>{const c=document.createElement('canvas');c.width=c.height=64;\n    const g=c.getContext('2d');const gr=g.createRadialGradient(32,32,4,32,32,30);\n    gr.addColorStop(0,'rgba(255,255,255,1)');gr.addColorStop(1,'rgba(255,255,255,0)');\n    g.fillStyle=gr;g.fillRect(0,0,64,64);return new THREE.CanvasTexture(c);})();\n  function sprayAt(){\n    const ray=new THREE.Raycaster();\n    ray.setFromCamera(new THREE.Vector2(0,0),camera);\n    const hits=ray.intersectObjects(collid);\n    if(!hits.length||hits[0].distance>6)return;\n    const p=hits[0].point.clone().addScaledVector(hits[0].face.normal,0.012);\n    const s=new THREE.Sprite(new THREE.SpriteMaterial({map:sprayTex,color:SPRAY[sprayIdx],transparent:true,opacity:.9,depthWrite:false}));\n    s.scale.set(.35,.35,1); s.position.copy(p); scene.add(s);\n    api.history.push({type:'spray',obj:s});\n  }\n\n  // \u0633\u0627\u062e\u062a \u062f\u06cc\u0648\u0627\u0631/\u062f\u0631\u0628 \u0631\u0648\u06cc \u062f\u06cc\u0648\u0627\u0631\u0647\u0627 \u06cc\u0627 \u0632\u0645\u06cc\u0646\n  function pickPoint(){\n    const ray=new THREE.Raycaster();\n    ray.setFromCamera(new THREE.Vector2(0,0),camera);\n    const hits=ray.intersectObjects([...collid,floor]);\n    return hits.length?hits[0].point:null;\n  }\n  function snapG(v){return Math.round(v*2)/2;} // \u06af\u0631\u06cc\u062f \u06f5\u06f0cm \u0645\u062b\u0644 wcfix\n  function clickBuild(){\n    const p=pickPoint(); if(!p)return;\n    if(tool==='wall'){\n      const np=new THREE.Vector3(snapG(p.x),0,snapG(p.z));\n      if(buildStep===0){startP=np;buildStep=1;ghost.visible=true;onHint('\u0646\u0642\u0637\u0647\u0654 \u062f\u0648\u0645\u061f');}\n      else{\n        const dx=np.x-startP.x,dz=np.z-startP.z;\n        if(Math.abs(dx)>=Math.abs(dz))np.z=startP.z; else np.x=startP.x; // \u06af\u0648\u0646\u06cc\u0627\n        if(Math.hypot(dx,dz)>0.4){\n          const mesh=addBox((startP.x+np.x)/2,H/2,(startP.z+np.z)/2,W,H,Math.hypot(np.x-startP.x,np.z-startP.z),Math.atan2(np.x-startP.x,np.z-startP.z),wallMat);\n          api.history.push({type:'wall3d',obj:mesh});\n          api.built.walls.push({a:[startP.x,startP.z],b:[np.x,np.z]});\n          onSync();\n        }\n        buildStep=0;startP=null;ghost.visible=false;\n      }\n    }else if(tool==='door'){\n      // \u0622\u0647\u0646\u0631\u0628\u0627: \u0646\u0632\u062f\u06cc\u06a9\u200c\u062a\u0631\u06cc\u0646 \u062f\u06cc\u0648\u0627\u0631 \u062f\u0627\u062f\u0647/\u0633\u0627\u062e\u062a\u0647\u200c\u0634\u062f\u0647\n      let best=null,bd=1e9;\n      const allWalls=DATA.walls.concat(api.built.walls.map((w,i)=>({a:w.a,b:w.b})));\n      for(const w of allWalls){\n        const dx=w.b[0]-w.a[0],dz=w.b[1]-w.a[1],L2=dx*dx+dz*dz;if(L2<1e-9)continue;\n        let t=((p.x-w.a[0])*dx+(p.z-w.a[1])*dz)/L2;t=THREE.MathUtils.clamp(t,0.1,0.9);\n        const cx=w.a[0]+dx*t,cz=w.a[1]+dz*t,d=Math.hypot(p.x-cx,p.z-cz);\n        if(d<bd){bd=d;best={w,t,cx,cz,L:Math.sqrt(L2)};}\n      }\n      if(best&&bd<0.9){\n        const ow=0.9;\n        const ux=(best.w.b[0]-best.w.a[0])/best.L, uz=(best.w.b[1]-best.w.a[1])/best.L;\n        addBox(best.cx-ux*ow/2,H/2,best.cz-uz*ow/2,W/2,H,0.06,Math.atan2(ux,uz),wallMat);\n        addBox(best.cx+ux*ow/2,H/2,best.cz+uz*ow/2,W/2,H,0.06,Math.atan2(ux,uz),wallMat);\n        addBox(best.cx,H-0.05,best.cz,W/2,H,0.06,Math.atan2(ux,uz),wallMat);\n        const pivot=new THREE.Group();pivot.position.set(best.cx-ux*ow/2,0,best.cz-uz*ow/2);\n        const leaf=new THREE.Mesh(new THREE.BoxGeometry(ow,2.1,0.05),doorMat);\n        leaf.position.set(ux*ow/2,1.05,0);leaf.castShadow=true;\n        pivot.add(leaf);const on=Math.atan2(ux,uz);pivot.rotation.y=on;\n        pivot.userData={open:false,targetRot:on,baseRot:on};scene.add(pivot);interact.push(pivot);animated.push(pivot);\n        api.built.doors.push({wall:{a:best.w.a,b:best.w.b},t:best.t*best.L,w:ow});\n        api.history.push({type:'door3d',obj:pivot});\n        onSync();\n        onHint('\u062f\u0631\u0628 \u0646\u0635\u0628 \u0634\u062f \u2014 F \u0628\u0627\u0632/\u0628\u0633\u062a\u0647');\n      }else onHint('\u0646\u0632\u062f\u06cc\u06a9 \u062f\u06cc\u0648\u0627\u0631 \u06a9\u0644\u06cc\u06a9 \u06a9\u0646');\n    }\n  }\n\n  // ==== \u0648\u0631\u0648\u062f/\u062e\u0631\u0648\u062c ====\n  const blk=document.getElementById('m3blk');\n  const enter=()=>{dom.requestPointerLock();blk.style.display='none';};\n  blk.addEventListener('click',enter);\n  document.addEventListener('pointerlockchange',()=>{ if(!document.pointerLockElement) blk.style.display='flex'; });\n\n  // ==== \u0631\u0648\u06cc\u062f\u0627\u062f\u0647\u0627 ====\n  const md=e=>{\n    if(!controls.isLocked)return;\n    if(e.button===0){\n      if(tool==='spray')spraying=true;\n      else if(tool==='wall'||tool==='door')clickBuild();\n    }else if(e.button===2&&tool==='wall'){buildStep=0;startP=null;ghost.visible=false;onHint('\u0644\u063a\u0648 \u0634\u062f');}\n  };\n  const mu=()=>spraying=false;\n  const mm=()=>{ if(spraying)sprayAt();\n    if(tool==='wall'&&buildStep===1){\n      const p=pickPoint();\n      if(p){const dx=snapG(p.x)-startP.x,dz=snapG(p.z)-startP.z;\n        let ex=snapG(p.x),ez=snapG(p.z);\n        if(Math.abs(dx)>=Math.abs(dz))ez=startP.z;else ex=startP.x;\n        const L=Math.hypot(ex-startP.x,ez-startP.z);\n        ghost.scale.set(W,L,0.12);ghost.position.set((startP.x+ex)/2,H/2,(startP.z+ez)/2);\n        ghost.rotation.y=Math.atan2(ex-startP.x,ez-startP.z);ghost.visible=L>0.3;}\n    }};\n  renderer.domElement.addEventListener('mousedown',md);\n  addEventListener('mouseup',mu);\n  addEventListener('mousemove',mm);\n  const ctxmenu=e=>e.preventDefault();\n  addEventListener('contextmenu',ctxmenu);\n  const keyQ=e=>{if(e.code==='KeyQ'&&controls.isLocked){sprayIdx=(sprayIdx+1)%SPRAY.length;onHint('\u0631\u0646\u06af \u0627\u0633\u067e\u0631\u06cc: '+['\u0642\u0631\u0645\u0632','\u0633\u0628\u0632','\u0622\u0628\u06cc','\u0632\u0631\u062f','\u0635\u0648\u0631\u062a\u06cc','\u0641\u06cc\u0631\u0648\u0632\u0647\u200c\u0627\u06cc','\u0633\u0641\u06cc\u062f','\u0645\u0634\u06a9\u06cc'][sprayIdx]);}};\n  addEventListener('keydown',keyQ);\n\n  // ==== \u062d\u0631\u06a9\u062a ====\n  const clock=new THREE.Clock();\n  let raf;\n  function anim(){\n    raf=requestAnimationFrame(anim);\n    const dt=Math.min(clock.getDelta(),.05);\n    for(const g of animated){\n      if(g.userData.targetRot===undefined)continue;\n      const d=g.userData.targetRot-g.rotation.y;\n      if(Math.abs(d)>0.001)g.rotation.y+=d*Math.min(1,dt*8);\n    }\n    if(controls.isLocked){\n      const v=new THREE.Vector3();\n      if(keys['KeyW'])v.z-=1;if(keys['KeyS'])v.z+=1;\n      if(keys['KeyA'])v.x-=1;if(keys['KeyD'])v.x+=1;\n      if(v.lengthSq()){\n        v.normalize();\n        if(keys['ShiftLeft']||keys['ShiftRight'])v.multiplyScalar(RUN);\n        v.applyQuaternion(camera.quaternion);v.y=0;v.normalize();\n        // \u0628\u0631\u062e\u0648\u0631\u062f \u0633\u0627\u062f\u0647: \u06af\u0627\u0645 \u0628\u0639\u062f\u06cc \u062f\u0627\u062e\u0644 \u0647\u06cc\u0686 \u0628\u0627\u06a9\u0633\u06cc \u0646\u0628\u0627\u0634\u062f\n        const nx=camera.position.x+v.x*WALK*dt, nz=camera.position.z+v.z*WALK*dt;\n        if(!hitsAt(nx,camera.position.z))camera.position.x=nx;\n        if(!hitsAt(camera.position.x,nz))camera.position.z=nz;\n      }\n      camera.position.y=EYE;\n    }\n    renderer.render(scene,camera);\n  }\n  function hitsAt(x,z){\n    for(const c of collid){\n      if(Math.abs(EYE-c.position.y)>H/2+0.1)continue;\n      // \u0645\u062e\u062a\u0635\u0627\u062a \u0645\u062d\u0644\u06cc \u0628\u0627\u06a9\u0633 \u0628\u0627 \u062a\u0648\u062c\u0647 \u0628\u0647 \u0686\u0631\u062e\u0634 y\n      const dx=x-c.position.x, dz=z-c.position.z;\n      const ry=-c.rotation.y;\n      const lx=dx*Math.cos(ry)-dz*Math.sin(ry), lz=dx*Math.sin(ry)+dz*Math.cos(ry);\n      const px=c.geometry.parameters.width/2+0.25, pz=c.geometry.parameters.depth/2+0.25;\n      if(Math.abs(lx)<px&&Math.abs(lz)<pz)return true;\n    }\n    return false;\n  }\n  anim();\n\n  const api={\n    history:[],built:{walls:[],doors:[]},\n    setTOD,\n    dispose(){cancelAnimationFrame(raf);\n      removeEventListener('keydown',kd);removeEventListener('keyup',ku);\n      removeEventListener('keydown',keyQ);removeEventListener('mouseup',mu);\n      removeEventListener('mousemove',mm);removeEventListener('contextmenu',ctxmenu);\n      renderer.dispose();container.innerHTML='';},\n    getBuilt(){return api.built;},\n    debugBuildWall(ax,az,bx,bz){\n      // \u0647\u0645\u0627\u0646 \u0645\u0646\u0637\u0642 clickBuild \u062f\u06cc\u0648\u0627\u0631 \u2014 \u0628\u0631\u0627\u06cc \u062a\u0633\u062a headless\n      const s=new THREE.Vector3(ax,0,az), e=new THREE.Vector3(bx,0,bz);\n      const mesh=addBox((s.x+e.x)/2,H/2,(s.z+e.z)/2,W,H,Math.hypot(e.x-s.x,e.z-s.z),Math.atan2(e.x-s.x,e.z-s.z),wallMat);\n      api.history.push({type:'wall3d',obj:mesh});\n      api.built.walls.push({a:[s.x,s.z],b:[e.x,e.z]});\n      return api.built.walls.length;\n    },\n    debugBuildDoor(ax,az,bx,bz,t,ow){\n      const w={a:[ax,az],b:[bx,bz]}; const L=Math.hypot(bx-ax,bz-az);\n      const ux=(bx-ax)/L, uz=(bz-az)/L;\n      const cx=ax+(bx-ax)*t, cz=az+(bz-az)*t;\n      addBox(cx-ux*ow/2,H/2,cz-uz*ow/2,W/2,H,0.06,Math.atan2(ux,uz),wallMat);\n      addBox(cx+ux*ow/2,H/2,cz+uz*ow/2,W/2,H,0.06,Math.atan2(ux,uz),wallMat);\n      addBox(cx,H-0.05,cz,W/2,H,0.06,Math.atan2(ux,uz),wallMat);\n      const pivot=new THREE.Group();pivot.position.set(cx-ux*ow/2,0,cz-uz*ow/2);\n      const leaf=new THREE.Mesh(new THREE.BoxGeometry(ow,2.1,0.05),doorMat);\n      leaf.position.set(ux*ow/2,1.05,0);leaf.castShadow=true;\n      pivot.add(leaf);const on=Math.atan2(ux,uz);pivot.rotation.y=on;\n      pivot.userData={open:false,targetRot:on,baseRot:on};scene.add(pivot);interact.push(pivot);animated.push(pivot);\n      api.built.doors.push({wall:{a:w.a,b:w.b},t:t*L,w:ow});\n      return api.built.doors.length;\n    },\n    debugSpray(){ sprayAt(); return api.history.filter(h=>h.type==='spray').length; },\n    debugLook(yaw,pitch){ euler.y=yaw; euler.x=pitch||0; camera.rotation.set(euler.x,euler.y,0,'YXZ'); },\n    debugPos(x,z){ camera.position.set(x,EYE,z); }\n  };\n  var apiRef=api;\n  return api;\n}\nwindow.__createWorld3=createWorld;\n";
+const M3_WORLD_SRC="const THREE=window.THREE3;\n/* HOVI 3D world \u2014 v20 (\u0628\u0627\u0632\u0646\u0648\u06cc\u0633\u06cc \u0627\u0628\u0632\u0627\u0631\u0647\u0627\u06cc \u0633\u0627\u062e\u062a \u0627\u0632 wcfix-v2 \u0631\u0648\u06cc \u062f\u0627\u062f\u0647\u0654 HOVI) */\nfunction createWorld(container, DATA, onSync, onHint){\n  const H=2.8, W=0.2, EYE=1.6, WALK=2.6, RUN=1.8;\n  const scene=new THREE.Scene(); scene.background=new THREE.Color(0x87ceeb);\n  const camera=new THREE.PerspectiveCamera(70,innerWidth/innerHeight,0.05,200);\n  camera.position.set(1,EYE,1);\n  const renderer=new THREE.WebGLRenderer({antialias:true});\n  renderer.setSize(innerWidth,innerHeight);\n  renderer.shadowMap.enabled=true; renderer.shadowMap.type=THREE.PCFSoftShadowMap;\n  renderer.outputColorSpace=THREE.SRGBColorSpace; renderer.toneMapping=THREE.ACESFilmicToneMapping;\n  container.appendChild(renderer.domElement);\n\n  const amb=new THREE.AmbientLight(0xffffff,.55); scene.add(amb);\n  const hemi=new THREE.HemisphereLight(0xbfd8ff,0x8a7a66,.45); scene.add(hemi);\n  const sun=new THREE.DirectionalLight(0xffeecc,1.4); sun.castShadow=true;\n  sun.shadow.mapSize.set(2048,2048);\n  Object.assign(sun.shadow.camera,{left:-20,right:20,top:20,bottom:-20,near:.5,far:80});\n  scene.add(sun);\n\n  // ==== \u062e\u0648\u0631\u0634\u06cc\u062f (\u06f0\u2013\u06f2\u06f4 \u0645\u062b\u0644 \u062a\u0648\u0631 HOVI) ====\n  let tod=12;\n  function updateSun(){\n    const t=(tod%24)/24, ang=(t-0.25)*Math.PI*2, sh=Math.sin(ang);\n    const skyMix=THREE.MathUtils.clamp((sh+0.3)/1.3,0,1);\n    scene.background=new THREE.Color(0x080820).lerp(new THREE.Color(0x87ceeb),skyMix);\n    sun.position.set(40*Math.cos(ang),40*Math.max(0.1,sh),40*Math.sin(ang));\n    sun.intensity=THREE.MathUtils.clamp(sh*1.3,0.15,1.4);\n    amb.intensity=THREE.MathUtils.clamp(0.2+sh*0.6,0.12,0.75);\n    hemi.intensity=0.12+skyMix*0.38;\n  }\n  updateSun();\n  const setTOD=v=>{tod=v;updateSun();};\n\n  // ==== \u0632\u0645\u06cc\u0646 ====\n  let bx0=1e9,bx1=-1e9,bz0=1e9,bz1=-1e9;\n  for(const w of DATA.walls){bx0=Math.min(bx0,w.a[0],w.b[0]);bx1=Math.max(bx1,w.a[0],w.b[0]);bz0=Math.min(bz0,w.a[1],w.b[1]);bz1=Math.max(bz1,w.a[1],w.b[1]);}\n  if(!DATA.walls.length){bx0=-5;bx1=5;bz0=-5;bz1=5;}\n  const fx=(bx0+bx1)/2,fz=(bz0+bz1)/2;\n  const floor=new THREE.Mesh(new THREE.PlaneGeometry(bx1-bx0+6,bz1-bz0+6),new THREE.MeshStandardMaterial({color:0xdad5cc,roughness:.95}));\n  floor.rotation.x=-Math.PI/2; floor.position.set(fx,0,fz); floor.receiveShadow=true; scene.add(floor);\n\n  const wallMat=new THREE.MeshStandardMaterial({color:0xd8d2c8,roughness:.75});\n  const doorMat=new THREE.MeshStandardMaterial({color:0x8a6b46,roughness:.6});\n  const ghostMat=new THREE.MeshBasicMaterial({color:0x00ffcc,transparent:true,opacity:.35});\n  const collid=[], interact=[];\n\n  function addBox(x,y,z,lx,ly,lz,ry,mat,solid=true){\n    const m=new THREE.Mesh(new THREE.BoxGeometry(lx,ly,lz),mat);\n    m.position.set(x,y,z); if(ry)m.rotation.y=ry;\n    m.castShadow=true; m.receiveShadow=true; scene.add(m);\n    if(solid)collid.push(m);\n    return m;\n  }\n  // ==== \u062f\u06cc\u0648\u0627\u0631\u0647\u0627\u06cc \u062f\u0627\u062f\u0647 \u0628\u0627 \u06af\u067e \u062f\u0631\u0628\u200c\u0647\u0627 ====\n  function buildWall(w){\n    const ax=w.a[0],az=w.a[1],bx=w.b[0],bz=w.b[1];\n    const L=Math.hypot(bx-ax,bz-az); if(L<0.01)return;\n    const on=Math.atan2(bx-ax,bz-az), ux=(bx-ax)/L, uz=(bz-az)/L;\n    const cuts=[0,1];\n    for(const o of (DATA.doors||[])) if(o.wallId===w.id) cuts.push(o.t/L-o.w/2/L, o.t/L+o.w/2/L);\n    cuts.sort((a,b)=>a-b);\n    for(let i=0;i<cuts.length-1;i++){\n      const s0=Math.max(0,cuts[i]), s1=Math.min(1,cuts[i+1]);\n      if(s1-s0<0.02)continue;\n      const p1x=ax+(bx-ax)*s0,p1z=az+(bz-az)*s0,p2x=ax+(bx-ax)*s1,p2z=az+(bz-az)*s1;\n      addBox((p1x+p2x)/2,H/2,(p1z+p2z)/2,W,H,Math.hypot(p2x-p1x,p2z-p1z),on,wallMat);\n    }\n    // \u062f\u0631\u0628\u200c\u0647\u0627\u06cc \u0645\u0648\u062c\u0648\u062f: \u0642\u0627\u0628 + \u0644\u0646\u06af\u0647\u0654 \u0627\u0646\u06cc\u0645\u06cc\u0634\u0646\u06cc\n    for(const o of (DATA.doors||[])){\n      if(o.wallId!==w.id)continue;\n      const c=o.t/L, cx=ax+(bx-ax)*c, cz=az+(bz-az)*c, ow=o.w;\n      if(o.type==='open'){ continue; } // \u0628\u0627\u0632\u0634\u0648\u06cc \u0628\u062f\u0648\u0646 \u062f\u0631\u0628: \u0647\u06cc\u0686\n      if(o.type==='slide'){\n        // \u06a9\u0634\u0648\u06cc\u06cc: \u0644\u0646\u06af\u0647\u0654 \u062b\u0627\u0628\u062a \u0633\u0631\u062a\u0627\u0633\u0631\u06cc \u062f\u0627\u062e\u0644 \u062f\u06cc\u0648\u0627\u0631\n        const leafS=new THREE.Mesh(new THREE.BoxGeometry(ow,2.1,0.05),doorMat);\n        leafS.position.set(cx,1.05,cz); leafS.rotation.y=on; leafS.castShadow=true;\n        scene.add(leafS); continue;\n      }\n      addBox(cx-ux*ow/2,H/2,cz-uz*ow/2,W/2,H,0.06,on,wallMat);\n      addBox(cx+ux*ow/2,H/2,cz+uz*ow/2,W/2,H,0.06,on,wallMat);\n      addBox(cx,H-0.05,cz,W/2,H,0.06,on,wallMat);\n      const halfW=(o.type==='double')?ow/2:ow;\n      const hingeSign=(o.hinge||1), swingSign=(o.swing||1);\n      const leaf2=new THREE.Mesh(new THREE.BoxGeometry(halfW,2.1,0.05),doorMat);\n      const pivot=new THREE.Group();\n      if(o.type==='double'){\n        // \u062f\u0648\u0644\u0646\u06af\u0647: \u062f\u0648 pivot \u0642\u0631\u06cc\u0646\u0647\n        const pivA=new THREE.Group(); pivA.position.set(cx-ux*ow/2,0,cz-uz*ow/2);\n        const la=new THREE.Mesh(new THREE.BoxGeometry(halfW,2.1,0.05),doorMat);\n        la.position.set(ux*halfW/2,1.05,0); la.castShadow=true;\n        pivA.add(la); pivA.rotation.y=on; scene.add(pivA);\n        pivA.userData={open:false,targetRot:on}; interact.push(pivA);\n        const pivB=new THREE.Group(); pivB.position.set(cx+ux*ow/2,0,cz+uz*ow/2);\n        const lb=la.clone(); lb.position.set(-ux*halfW/2,1.05,0);\n        pivB.add(lb); pivB.rotation.y=on; scene.add(pivB);\n        pivB.userData={open:false,targetRot:-on}; interact.push(pivB);\n      } else {\n        // \u062a\u06a9\u200c\u0644\u0646\u06af\u0647: \u0644\u0648\u0644\u0627 \u0633\u0645\u062a hinge\u060c \u0628\u0627\u0632\u0634\u0648 \u0628\u0647 \u0633\u0645\u062a swing\n        pivot.position.set(cx-ux*ow/2*hingeSign,0,cz-uz*ow/2*hingeSign);\n        leaf2.position.set(ux*ow/2*hingeSign,1.05,0); leaf2.castShadow=true;\n        pivot.add(leaf2); pivot.rotation.y=on; scene.add(pivot);\n        pivot.userData={open:false,targetRot:on*swingSign};\n        interact.push(pivot);\n      }\n    }\n  }\n  for(const w of DATA.walls)buildWall(w);\n  for(const wl of (DATA.wells||[])){\n    const x0=wl.a[0],z0=wl.a[1],x1=wl.b[0],z1=wl.b[1];\n    const bands=[[x0,z0,x1,z0],[x1,z0,x1,z1],[x1,z1,x0,z1],[x0,z1,x0,z0]];\n    for(const bd of bands){\n      const L2=Math.hypot(bd[2]-bd[0],bd[3]-bd[1]); if(L2<0.02)continue;\n      addBox((bd[0]+bd[2])/2,H/2,(bd[1]+bd[3])/2,W,H,L2,Math.atan2(bd[2]-bd[0],bd[3]-bd[1]),wallMat);\n    }\n  }\n  for(const c of (DATA.columns||[])){\n    const xs=c.pts.map(p=>p[0]),zs=c.pts.map(p=>p[1]);\n    const cx=(Math.min(...xs)+Math.max(...xs))/2, cz=(Math.min(...zs)+Math.max(...zs))/2;\n    const lw=Math.max(...xs)-Math.min(...xs), ld=Math.max(...zs)-Math.min(...zs);\n    addBox(cx,H/2,cz,lw,H,ld,0,new THREE.MeshStandardMaterial({color:0x9a9a9a,roughness:.8}));\n  }\n    const addRun=(a,b,w,i0,n,Hs)=>{\n    const ax=a[0],az=a[1],bx=b[0],bz=b[1];\n    const dx=bx-ax,dz=bz-az,L=Math.hypot(dx,dz);\n    if(!(L>0.05))return;\n    const ry=Math.atan2(-(dz),dx);\n    const tread=L/n, rise=Hs/n;\n    const smat=new THREE.MeshStandardMaterial({color:0xb0b0b0,roughness:.75});\n    for(let i=0;i<n;i++){\n      const cx=ax+dx*(i+0.5)/n, cz=az+dz*(i+0.5)/n, top=Hs*(i0+i+1)/Math.max(1,n);\n      addBox(cx,top/2,cz,tread,top,w,ry,smat);\n    }\n  };\n  for(const s of (DATA.stairs||[])){\n    const Hs=s.h||2.8, n=Math.max(2,Math.round(Hs/0.18));\n    if(s.type==='straight'){\n      addRun(s.a,s.b,s.w||1,0,n,Hs);\n    } else if(s.type==='L'){\n      const L1=Math.hypot(s.b[0]-s.a[0],s.b[1]-s.a[1]);\n      const L2=Math.hypot(s.c[0]-s.b[0],s.c[1]-s.b[1]);\n      const n1=Math.max(1,Math.round(n*L1/(L1+L2)));\n      addRun(s.a,s.b,s.w||1,0,n1,Hs);\n      addRun(s.b,s.c,s.w||1,n1,n-n1,Hs);\n    } else if(s.type==='U'){\n      const L1=Math.hypot(s.b[0]-s.a[0],s.b[1]-s.a[1])||0.001;\n      const ux=(s.b[0]-s.a[0])/L1, uz=(s.b[1]-s.a[1])/L1;\n      const nx=-uz, nz=ux;\n      const lat=(s.c[0]-s.b[0])*nx+(s.c[1]-s.b[1])*nz;\n      const gap=Math.abs(lat)||s.w||1;\n      const sg=lat>=0?1:-1;\n      const s2=[s.b[0]+nx*gap*sg, s.b[1]+nz*gap*sg];\n      const L2=Math.hypot(s.c[0]-s2[0], s.c[1]-s2[1]);\n      const n1=Math.max(1,Math.round(n*L1/(L1+L2)));\n      addRun(s.a,s.b,s.w||1,0,n1,Hs);\n      addRun(s2,s.c,s.w||1,n1,n-n1,Hs);\n    } else if(s.type==='J'){\n      const L1=Math.hypot(s.b[0]-s.a[0],s.b[1]-s.a[1])||0.001;\n      const L2=Math.hypot(s.c[0]-s.b[0],s.c[1]-s.b[1])||0.001;\n      const Lc=Math.min((s.w||1)*0.9, L1*0.4);\n      const b2=[s.b[0]-(s.b[0]-s.a[0])/L1*Lc, s.b[1]-(s.b[1]-s.a[1])/L1*Lc];\n      const c2=[s.b[0]+(s.c[0]-s.b[0])/L2*Math.min(Lc,L2*0.5), s.b[1]+(s.c[1]-s.b[1])/L2*Math.min(Lc,L2*0.5)];\n      const Lr1=Math.hypot(b2[0]-s.a[0], b2[1]-s.a[1]);\n      const Lr2=Math.hypot(s.c[0]-c2[0], s.c[1]-c2[1]);\n      const n1=Math.max(1,Math.round(n*Lr1/(Lr1+Lr2+Lc)));\n      addRun(s.a,b2,s.w||1,0,n1,Hs);\n      addRun(c2,s.c,s.w||1,n1,n-n1,Hs);\n      const topMid=Hs*(n1+0.5)/n;\n      const smat=new THREE.MeshStandardMaterial({color:0xb0b0b0,roughness:.75});\n      const hw=(s.w||1)/2;\n      const u1=[(s.b[0]-s.a[0])/L1,(s.b[1]-s.a[1])/L1];\n      const u2=[(s.c[0]-s.b[0])/L2,(s.c[1]-s.b[1])/L2];\n      const cx=(s.b[0]+ (s.b[0]+u2[0]*hw*0.5))/2, cz=(s.b[1]+(s.b[1]+u2[1]*hw*0.5))/2;\n      const ry=-Math.atan2(u2[1],u2[0]);\n      addBox(cx, topMid/2, cz, hw*2.2, topMid, hw*2.2, ry, smat);\n    } else if(s.type==='spiral'){\n      const R=s.r||0.9, turn=s.turn||1, nP=Math.max(10,Math.round(n*0.7));\n      const sweep=Math.PI*1.75*turn;\n      const smat=new THREE.MeshStandardMaterial({color:0xb0b0b0,roughness:.75});\n      const rIn=R*0.18, rMid=(R+rIn)/2, span=R-rIn;\n      for(let i=0;i<nP;i++){\n        const a0=sweep*i/nP, a1=sweep*(i+1)/nP, top=Hs*(i+1)/nP;\n        const am=(a0+a1)/2;\n        const cx=s.a[0]+rMid*Math.cos(am), cz=s.a[1]+rMid*Math.sin(am);\n        addBox(cx,top/2,cz,span*0.95, top, span*0.4, -am+(turn>0?Math.PI/2:-Math.PI/2), smat);\n      }\n    }\n  }\n  for(const ev of (DATA.elevs||[])){\n    const EW=ev.w||1.6, ED=ev.d||1.7;\n    addBox(ev.x,H/2,ev.z,ED,H,EW,(ev.rot||0),new THREE.MeshStandardMaterial({color:0x8a8f94,roughness:.6}));\n  }\n  // \u0628\u0627\u0644\u06a9\u0646: \u06a9\u0641 + \u0646\u0631\u062f\u0647 \u062f\u0648\u0631 \u0647\u0631 \u0636\u0644\u0639\n  const balcMat=new THREE.MeshStandardMaterial({color:0xc9b88a,roughness:.85});\n  const railMat=new THREE.MeshStandardMaterial({color:0x2a2e34,roughness:.6,metalness:.55});\n  const railMidMat=new THREE.MeshStandardMaterial({color:0x2a2e34,roughness:.6,metalness:.55});\n  function buildRail(pts, hTotal){\n    const postR=0.02;\n    const railH=0.05, railW=0.06, midH=0.5;\n    for(let i=0;i<pts.length-1;i++){\n      const ax=pts[i][0], az=pts[i][1], bx=pts[i+1][0], bz=pts[i+1][1];\n      const dx=bx-ax, dz=bz-az, L=Math.hypot(dx,dz); if(L<0.02)continue;\n      const ux=dx/L, uz=dz/L;\n      const on=Math.atan2(dx,dz);\n      addBox((ax+bx)/2, hTotal-railH/2, (az+bz)/2, L, railH, railW, on, railMat, false);\n      addBox((ax+bx)/2, midH/2, (az+bz)/2, L, 0.02, 0.02, on, railMidMat, false);\n      const step=1.2;\n      const nPosts=Math.max(2, Math.ceil(L/step)+1);\n      for(let k=0;k<nPosts;k++){\n        const t=k/(nPosts-1);\n        const px=ax+ux*L*t, pz=az+uz*L*t;\n        const pm=new THREE.Mesh(new THREE.CylinderGeometry(postR,postR,hTotal,8),railMat);\n        pm.position.set(px, hTotal/2, pz); pm.castShadow=true; pm.receiveShadow=true;\n        scene.add(pm);\n      }\n    }\n  }\n  for(const bc of (DATA.balcs||[])){\n    const pts=bc.pts;\n    if(!pts||pts.length<3) continue;\n    const shape=new THREE.Shape();\n    shape.moveTo(pts[0][0], pts[0][1]);\n    for(let i=1;i<pts.length;i++) shape.lineTo(pts[i][0], pts[i][1]);\n    shape.closePath();\n    const floorGeo=new THREE.ExtrudeGeometry(shape, {depth:0.12, bevelEnabled:false});\n    const floor=new THREE.Mesh(floorGeo, balcMat);\n    floor.rotation.x=-Math.PI/2;\n    floor.position.y=0.06;\n    floor.receiveShadow=true; floor.castShadow=true;\n    scene.add(floor);\n    const ring=pts.concat([pts[0]]);\n    buildRail(ring, 1.0);\n  }\n  for(const rl of (DATA.rails||[])){\n    if(!rl.pts||rl.pts.length<2) continue;\n    buildRail(rl.pts, 1.0);\n  }\n\n  // ==== \u06a9\u0646\u062a\u0631\u0644 ====\n  // \u06a9\u0646\u062a\u0631\u0644 \u062f\u0633\u062a\u06cc: pointer lock + yaw/pitch (\u0628\u062f\u0648\u0646 PLC \u2014 \u0633\u0627\u0632\u06af\u0627\u0631 \u0628\u0627 file://)\n  const controls={isLocked:false};\n  const keys={}; const euler={y:0,x:0};\n  const dom=renderer.domElement;\n  dom.addEventListener('click',()=>{ if(!controls.isLocked) dom.requestPointerLock(); });\n  const plc=()=>controls.isLocked=!!document.pointerLockElement;\n  document.addEventListener('pointerlockchange',plc);\n  const mmove=e=>{ if(!controls.isLocked)return;\n    euler.y-=e.movementX*0.0022; euler.x-=e.movementY*0.0022;\n    euler.x=Math.max(-1.55,Math.min(1.55,euler.x));\n    camera.rotation.set(euler.x,euler.y,0,'YXZ');\n  };\n  addEventListener('mousemove',mmove);\n  const kd=e=>{keys[e.code]=true;\n    if(e.code==='KeyF'&&controls.isLocked)toggleDoor();\n  };\n  const ku=e=>{keys[e.code]=false;};\n  addEventListener('keydown',kd); addEventListener('keyup',ku);\n\n  function toggleDoor(){\n    const ray=new THREE.Raycaster();\n    ray.setFromCamera(new THREE.Vector2(0,0),camera);\n    const hits=ray.intersectObjects(interact,true);\n    if(hits.length&&hits[0].distance<4){\n      let g=hits[0].object; while(g&&!g.userData.targetRot!==undefined&&g.parent)g=g.parent;\n      if(g.userData){g.userData.open=!g.userData.open;\n        g.userData.targetRot=g.userData.open?g.userData.baseRot!==undefined?g.userData.baseRot-Math.PI/2:((g.rotation.y||0)-Math.PI/2):(g.userData.baseRot??g.rotation.y);\n        if(g.userData.baseRot===undefined)g.userData.baseRot=g.userData.open?g.userData.targetRot+Math.PI/2:g.userData.targetRot;\n      }\n    }\n  }\n  // \u0633\u0627\u062f\u0647\u200c\u0633\u0627\u0632\u06cc: \u062f\u0631\u0628 \u0646\u0632\u062f\u06cc\u06a9 \u00d7 \u062f\u0648\u0631\u0627\u0646 \u0646\u0631\u0645\n  const animated=[];\n  for(const p of interact)animated.push(p);\n\n  // ==== \u0627\u0628\u0632\u0627\u0631 \u0633\u0627\u062e\u062a (\u0628\u0627\u0632\u0646\u0648\u06cc\u0633\u06cc wcfix) ====\n  let tool='none', buildStep=0, startP=null;\n  const ghost=new THREE.Mesh(new THREE.BoxGeometry(1,0.2,0.1),ghostMat);\n  ghost.visible=false; scene.add(ghost);\n  const SPRAY=[0xff4444,0x44ff44,0x4488ff,0xffee44,0xff44ff,0x44ffff,0xffffff,0x222222];\n  let sprayIdx=0;\n  function setTool(t){\n    tool=t; buildStep=0; startP=null; ghost.visible=false;\n    document.querySelectorAll('.m3t').forEach(b=>{\n      const on=b.dataset.t===t;\n      b.style.background=on?'#ffcc00':'#333';\n      b.style.color=on?'#000':'#ccc';\n    });\n    onHint(t==='wall'?'\u062f\u06cc\u0648\u0627\u0631: \u06f2 \u06a9\u0644\u06cc\u06a9 \u2014 \u0631\u0627\u0633\u062a\u200c\u06a9\u0644\u06cc\u06a9 \u0644\u063a\u0648':\n           t==='door'?'\u062f\u0631\u0628: \u06a9\u0644\u06cc\u06a9 \u0631\u0648\u06cc \u062f\u06cc\u0648\u0627\u0631 (\u0622\u0647\u0646\u0631\u0628\u0627)':\n           t==='spray'?'\u0627\u0633\u067e\u0631\u06cc: \u0646\u06af\u0647\u200c\u062f\u0627\u0631 \u0648 \u0628\u06a9\u0634 \u2014 Q \u0631\u0646\u06af \u0628\u0639\u062f\u06cc':'\u0646\u06af\u0627\u0647 \u0622\u0632\u0627\u062f');\n  }\n  document.querySelectorAll('.m3t').forEach(b=>b.onclick=()=>setTool(b.dataset.t));\n\n  // \u0627\u0633\u067e\u0631\u06cc\n  let spraying=false;\n  const sprayTex=(()=>{const c=document.createElement('canvas');c.width=c.height=64;\n    const g=c.getContext('2d');const gr=g.createRadialGradient(32,32,4,32,32,30);\n    gr.addColorStop(0,'rgba(255,255,255,1)');gr.addColorStop(1,'rgba(255,255,255,0)');\n    g.fillStyle=gr;g.fillRect(0,0,64,64);return new THREE.CanvasTexture(c);})();\n  function sprayAt(){\n    const ray=new THREE.Raycaster();\n    ray.setFromCamera(new THREE.Vector2(0,0),camera);\n    const hits=ray.intersectObjects(collid);\n    if(!hits.length||hits[0].distance>6)return;\n    const p=hits[0].point.clone().addScaledVector(hits[0].face.normal,0.012);\n    const s=new THREE.Sprite(new THREE.SpriteMaterial({map:sprayTex,color:SPRAY[sprayIdx],transparent:true,opacity:.9,depthWrite:false}));\n    s.scale.set(.35,.35,1); s.position.copy(p); scene.add(s);\n    api.history.push({type:'spray',obj:s});\n  }\n\n  // \u0633\u0627\u062e\u062a \u062f\u06cc\u0648\u0627\u0631/\u062f\u0631\u0628 \u0631\u0648\u06cc \u062f\u06cc\u0648\u0627\u0631\u0647\u0627 \u06cc\u0627 \u0632\u0645\u06cc\u0646\n  function pickPoint(){\n    const ray=new THREE.Raycaster();\n    ray.setFromCamera(new THREE.Vector2(0,0),camera);\n    const hits=ray.intersectObjects([...collid,floor]);\n    return hits.length?hits[0].point:null;\n  }\n  function snapG(v){return Math.round(v*2)/2;} // \u06af\u0631\u06cc\u062f \u06f5\u06f0cm \u0645\u062b\u0644 wcfix\n  function clickBuild(){\n    const p=pickPoint(); if(!p)return;\n    if(tool==='wall'){\n      const np=new THREE.Vector3(snapG(p.x),0,snapG(p.z));\n      if(buildStep===0){startP=np;buildStep=1;ghost.visible=true;onHint('\u0646\u0642\u0637\u0647\u0654 \u062f\u0648\u0645\u061f');}\n      else{\n        const dx=np.x-startP.x,dz=np.z-startP.z;\n        if(Math.abs(dx)>=Math.abs(dz))np.z=startP.z; else np.x=startP.x; // \u06af\u0648\u0646\u06cc\u0627\n        if(Math.hypot(dx,dz)>0.4){\n          const mesh=addBox((startP.x+np.x)/2,H/2,(startP.z+np.z)/2,W,H,Math.hypot(np.x-startP.x,np.z-startP.z),Math.atan2(np.x-startP.x,np.z-startP.z),wallMat);\n          api.history.push({type:'wall3d',obj:mesh});\n          api.built.walls.push({a:[startP.x,startP.z],b:[np.x,np.z]});\n          onSync();\n        }\n        buildStep=0;startP=null;ghost.visible=false;\n      }\n    }else if(tool==='door'){\n      // \u0622\u0647\u0646\u0631\u0628\u0627: \u0646\u0632\u062f\u06cc\u06a9\u200c\u062a\u0631\u06cc\u0646 \u062f\u06cc\u0648\u0627\u0631 \u062f\u0627\u062f\u0647/\u0633\u0627\u062e\u062a\u0647\u200c\u0634\u062f\u0647\n      let best=null,bd=1e9;\n      const allWalls=DATA.walls.concat(api.built.walls.map((w,i)=>({a:w.a,b:w.b})));\n      for(const w of allWalls){\n        const dx=w.b[0]-w.a[0],dz=w.b[1]-w.a[1],L2=dx*dx+dz*dz;if(L2<1e-9)continue;\n        let t=((p.x-w.a[0])*dx+(p.z-w.a[1])*dz)/L2;t=THREE.MathUtils.clamp(t,0.1,0.9);\n        const cx=w.a[0]+dx*t,cz=w.a[1]+dz*t,d=Math.hypot(p.x-cx,p.z-cz);\n        if(d<bd){bd=d;best={w,t,cx,cz,L:Math.sqrt(L2)};}\n      }\n      if(best&&bd<0.9){\n        const ow=0.9;\n        const ux=(best.w.b[0]-best.w.a[0])/best.L, uz=(best.w.b[1]-best.w.a[1])/best.L;\n        addBox(best.cx-ux*ow/2,H/2,best.cz-uz*ow/2,W/2,H,0.06,Math.atan2(ux,uz),wallMat);\n        addBox(best.cx+ux*ow/2,H/2,best.cz+uz*ow/2,W/2,H,0.06,Math.atan2(ux,uz),wallMat);\n        addBox(best.cx,H-0.05,best.cz,W/2,H,0.06,Math.atan2(ux,uz),wallMat);\n        const pivot=new THREE.Group();pivot.position.set(best.cx-ux*ow/2,0,best.cz-uz*ow/2);\n        const leaf=new THREE.Mesh(new THREE.BoxGeometry(ow,2.1,0.05),doorMat);\n        leaf.position.set(ux*ow/2,1.05,0);leaf.castShadow=true;\n        pivot.add(leaf);const on=Math.atan2(ux,uz);pivot.rotation.y=on;\n        pivot.userData={open:false,targetRot:on,baseRot:on};scene.add(pivot);interact.push(pivot);animated.push(pivot);\n        api.built.doors.push({wall:{a:best.w.a,b:best.w.b},t:best.t*best.L,w:ow});\n        api.history.push({type:'door3d',obj:pivot});\n        onSync();\n        onHint('\u062f\u0631\u0628 \u0646\u0635\u0628 \u0634\u062f \u2014 F \u0628\u0627\u0632/\u0628\u0633\u062a\u0647');\n      }else onHint('\u0646\u0632\u062f\u06cc\u06a9 \u062f\u06cc\u0648\u0627\u0631 \u06a9\u0644\u06cc\u06a9 \u06a9\u0646');\n    }\n  }\n\n  // ==== \u0648\u0631\u0648\u062f/\u062e\u0631\u0648\u062c ====\n  const blk=document.getElementById('m3blk');\n  const enter=()=>{dom.requestPointerLock();blk.style.display='none';};\n  blk.addEventListener('click',enter);\n  document.addEventListener('pointerlockchange',()=>{ if(!document.pointerLockElement) blk.style.display='flex'; });\n\n  // ==== \u0631\u0648\u06cc\u062f\u0627\u062f\u0647\u0627 ====\n  const md=e=>{\n    if(!controls.isLocked)return;\n    if(e.button===0){\n      if(tool==='spray')spraying=true;\n      else if(tool==='wall'||tool==='door')clickBuild();\n    }else if(e.button===2&&tool==='wall'){buildStep=0;startP=null;ghost.visible=false;onHint('\u0644\u063a\u0648 \u0634\u062f');}\n  };\n  const mu=()=>spraying=false;\n  const mm=()=>{ if(spraying)sprayAt();\n    if(tool==='wall'&&buildStep===1){\n      const p=pickPoint();\n      if(p){const dx=snapG(p.x)-startP.x,dz=snapG(p.z)-startP.z;\n        let ex=snapG(p.x),ez=snapG(p.z);\n        if(Math.abs(dx)>=Math.abs(dz))ez=startP.z;else ex=startP.x;\n        const L=Math.hypot(ex-startP.x,ez-startP.z);\n        ghost.scale.set(W,L,0.12);ghost.position.set((startP.x+ex)/2,H/2,(startP.z+ez)/2);\n        ghost.rotation.y=Math.atan2(ex-startP.x,ez-startP.z);ghost.visible=L>0.3;}\n    }};\n  renderer.domElement.addEventListener('mousedown',md);\n  addEventListener('mouseup',mu);\n  addEventListener('mousemove',mm);\n  const ctxmenu=e=>e.preventDefault();\n  addEventListener('contextmenu',ctxmenu);\n  const keyQ=e=>{if(e.code==='KeyQ'&&controls.isLocked){sprayIdx=(sprayIdx+1)%SPRAY.length;onHint('\u0631\u0646\u06af \u0627\u0633\u067e\u0631\u06cc: '+['\u0642\u0631\u0645\u0632','\u0633\u0628\u0632','\u0622\u0628\u06cc','\u0632\u0631\u062f','\u0635\u0648\u0631\u062a\u06cc','\u0641\u06cc\u0631\u0648\u0632\u0647\u200c\u0627\u06cc','\u0633\u0641\u06cc\u062f','\u0645\u0634\u06a9\u06cc'][sprayIdx]);}};\n  addEventListener('keydown',keyQ);\n\n  // ==== \u062d\u0631\u06a9\u062a ====\n  const clock=new THREE.Clock();\n  let raf;\n  function anim(){\n    raf=requestAnimationFrame(anim);\n    const dt=Math.min(clock.getDelta(),.05);\n    for(const g of animated){\n      if(g.userData.targetRot===undefined)continue;\n      const d=g.userData.targetRot-g.rotation.y;\n      if(Math.abs(d)>0.001)g.rotation.y+=d*Math.min(1,dt*8);\n    }\n    if(controls.isLocked){\n      const v=new THREE.Vector3();\n      if(keys['KeyW'])v.z-=1;if(keys['KeyS'])v.z+=1;\n      if(keys['KeyA'])v.x-=1;if(keys['KeyD'])v.x+=1;\n      if(v.lengthSq()){\n        v.normalize();\n        if(keys['ShiftLeft']||keys['ShiftRight'])v.multiplyScalar(RUN);\n        v.applyQuaternion(camera.quaternion);v.y=0;v.normalize();\n        // \u0628\u0631\u062e\u0648\u0631\u062f \u0633\u0627\u062f\u0647: \u06af\u0627\u0645 \u0628\u0639\u062f\u06cc \u062f\u0627\u062e\u0644 \u0647\u06cc\u0686 \u0628\u0627\u06a9\u0633\u06cc \u0646\u0628\u0627\u0634\u062f\n        const nx=camera.position.x+v.x*WALK*dt, nz=camera.position.z+v.z*WALK*dt;\n        if(!hitsAt(nx,camera.position.z))camera.position.x=nx;\n        if(!hitsAt(camera.position.x,nz))camera.position.z=nz;\n      }\n      camera.position.y=EYE;\n    }\n    renderer.render(scene,camera);\n  }\n  function hitsAt(x,z){\n    for(const c of collid){\n      if(Math.abs(EYE-c.position.y)>H/2+0.1)continue;\n      // \u0645\u062e\u062a\u0635\u0627\u062a \u0645\u062d\u0644\u06cc \u0628\u0627\u06a9\u0633 \u0628\u0627 \u062a\u0648\u062c\u0647 \u0628\u0647 \u0686\u0631\u062e\u0634 y\n      const dx=x-c.position.x, dz=z-c.position.z;\n      const ry=-c.rotation.y;\n      const lx=dx*Math.cos(ry)-dz*Math.sin(ry), lz=dx*Math.sin(ry)+dz*Math.cos(ry);\n      const px=c.geometry.parameters.width/2+0.25, pz=c.geometry.parameters.depth/2+0.25;\n      if(Math.abs(lx)<px&&Math.abs(lz)<pz)return true;\n    }\n    return false;\n  }\n  anim();\n\n  const api={\n    history:[],built:{walls:[],doors:[]},\n    setTOD,\n    dispose(){cancelAnimationFrame(raf);\n      removeEventListener('keydown',kd);removeEventListener('keyup',ku);\n      removeEventListener('keydown',keyQ);removeEventListener('mouseup',mu);\n      removeEventListener('mousemove',mm);removeEventListener('contextmenu',ctxmenu);\n      renderer.dispose();container.innerHTML='';},\n    getBuilt(){return api.built;},\n    debugBuildWall(ax,az,bx,bz){\n      // \u0647\u0645\u0627\u0646 \u0645\u0646\u0637\u0642 clickBuild \u062f\u06cc\u0648\u0627\u0631 \u2014 \u0628\u0631\u0627\u06cc \u062a\u0633\u062a headless\n      const s=new THREE.Vector3(ax,0,az), e=new THREE.Vector3(bx,0,bz);\n      const mesh=addBox((s.x+e.x)/2,H/2,(s.z+e.z)/2,W,H,Math.hypot(e.x-s.x,e.z-s.z),Math.atan2(e.x-s.x,e.z-s.z),wallMat);\n      api.history.push({type:'wall3d',obj:mesh});\n      api.built.walls.push({a:[s.x,s.z],b:[e.x,e.z]});\n      return api.built.walls.length;\n    },\n    debugBuildDoor(ax,az,bx,bz,t,ow){\n      const w={a:[ax,az],b:[bx,bz]}; const L=Math.hypot(bx-ax,bz-az);\n      const ux=(bx-ax)/L, uz=(bz-az)/L;\n      const cx=ax+(bx-ax)*t, cz=az+(bz-az)*t;\n      addBox(cx-ux*ow/2,H/2,cz-uz*ow/2,W/2,H,0.06,Math.atan2(ux,uz),wallMat);\n      addBox(cx+ux*ow/2,H/2,cz+uz*ow/2,W/2,H,0.06,Math.atan2(ux,uz),wallMat);\n      addBox(cx,H-0.05,cz,W/2,H,0.06,Math.atan2(ux,uz),wallMat);\n      const pivot=new THREE.Group();pivot.position.set(cx-ux*ow/2,0,cz-uz*ow/2);\n      const leaf=new THREE.Mesh(new THREE.BoxGeometry(ow,2.1,0.05),doorMat);\n      leaf.position.set(ux*ow/2,1.05,0);leaf.castShadow=true;\n      pivot.add(leaf);const on=Math.atan2(ux,uz);pivot.rotation.y=on;\n      pivot.userData={open:false,targetRot:on,baseRot:on};scene.add(pivot);interact.push(pivot);animated.push(pivot);\n      api.built.doors.push({wall:{a:w.a,b:w.b},t:t*L,w:ow});\n      return api.built.doors.length;\n    },\n    debugSpray(){ sprayAt(); return api.history.filter(h=>h.type==='spray').length; },\n    debugLook(yaw,pitch){ euler.y=yaw; euler.x=pitch||0; camera.rotation.set(euler.x,euler.y,0,'YXZ'); },\n    debugPos(x,z){ camera.position.set(x,EYE,z); }\n  };\n  var apiRef=api;\n  return api;\n}\nwindow.__createWorld3=createWorld;\n";
 function enter3D(){
   if(mode3d)return; mode3d=true;
   const data=JSON.parse(JSON.stringify(proj));
@@ -2429,18 +2281,6 @@ function hoviBuildGLTF(){
       parts.push({name:'well_'+wl.id+'_'+bi, start:b0, count:4, iStart, iCount:idx.length-iStart, mat:0});
     });
   }
-  // ناحیه: کف رنگی نیمه‌شفاف از fan مثلث‌ها
-  for(const z of (proj.zones||[])){
-    const pts=z.pts; if(!pts||pts.length<3) continue;
-    for(let i=1;i<pts.length-1;i++){
-      const a=pts[0], b=pts[i], c=pts[i+1];
-      const b0=pos.length/3, iS=idx.length;
-      pos.push(a[0],0.01,a[1], a[0],0.04,a[1], b[0],0.01,b[1], b[0],0.04,b[1], c[0],0.01,c[1], c[0],0.04,c[1]);
-      for(let k=0;k<6;k++) nrm.push(0,1,0);
-      idx.push(b0,b0+1,b0+2, b0+1,b0+3,b0+2, b0+1,b0+4,b0+3, b0+3,b0+4,b0+5);
-      parts.push({name:'zone_'+z.id+'_'+i, start:b0, count:6, iStart:iS, iCount:idx.length-iS, mat:6});
-    }
-  }
   // بالکن: کف + نرده دور
   for(const bc of (proj.balcs||[])){
     const pts=bc.pts; if(!pts||pts.length<3) continue;
@@ -2491,15 +2331,14 @@ function hoviBuildGLTF(){
   function partMax(p){ const m=[-1e9,-1e9,-1e9];
     for(let i=p.start*3;i<(p.start+p.count)*3;i+=3) for(let k=0;k<3;k++) m[k]=Math.max(m[k],posArr[i+k]);
     return m; }
-  // materials: 0 wall, 1 door, 2 glass, 3 column, 4 balcfloor, 5 rail, 6 zone
+  // materials: 0 wall, 1 door, 2 glass, 3 column
   const mats=[
     {name:'HOVI_wall', pbrMetallicRoughness:{baseColorFactor:[0.92,0.90,0.86,1], metallicFactor:0, roughnessFactor:0.9}},
     {name:'HOVI_door', pbrMetallicRoughness:{baseColorFactor:[0.45,0.30,0.18,1], metallicFactor:0, roughnessFactor:0.7}},
     {name:'HOVI_glass', pbrMetallicRoughness:{baseColorFactor:[0.65,0.80,0.85,0.35], metallicFactor:0, roughnessFactor:0.1}, alphaMode:'BLEND', doubleSided:true},
     {name:'HOVI_column', pbrMetallicRoughness:{baseColorFactor:[0.75,0.75,0.78,1], metallicFactor:0, roughnessFactor:0.85}},
     {name:'HOVI_balcfloor', pbrMetallicRoughness:{baseColorFactor:[0.79,0.72,0.54,1], metallicFactor:0, roughnessFactor:0.85}},
-    {name:'HOVI_rail', pbrMetallicRoughness:{baseColorFactor:[0.16,0.18,0.20,1], metallicFactor:0.55, roughnessFactor:0.6}},
-    {name:'HOVI_zone', pbrMetallicRoughness:{baseColorFactor:[0.30,0.60,0.85,0.35], metallicFactor:0, roughnessFactor:0.7}, alphaMode:'BLEND', doubleSided:true}
+    {name:'HOVI_rail', pbrMetallicRoughness:{baseColorFactor:[0.16,0.18,0.20,1], metallicFactor:0.55, roughnessFactor:0.6}}
   ];
   const gltf={
     asset:{version:'2.0', generator:'HOVI editor v21'},
