@@ -1,0 +1,587 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ویرایشگر HOVI — نسخه editor-v9</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { font-family:Tahoma,sans-serif; background:#141414; color:#eee; overflow:hidden; }
+  #topbar { position:absolute; top:0; left:0; right:0; height:52px; background:#1b1b1b;
+    border-bottom:2px solid #333; display:flex; align-items:center; gap:10px; padding:0 14px; z-index:10; }
+  #topbar .logo { font-weight:bold; color:#00ffcc; font-size:17px; margin-left:6px; }
+  .tool-btn { background:#262626; color:#ddd; border:2px solid #444; border-radius:9px;
+    padding:7px 16px; cursor:pointer; font-family:inherit; font-size:13px; transition:.15s; }
+  .tool-btn:hover { border-color:#666; }
+  .tool-btn.active { background:#00ffcc22; border-color:#00ffcc; color:#00ffcc; }
+  .sep { width:2px; height:28px; background:#333; margin:0 4px; }
+  #projName { background:#222; border:1px solid #444; color:#eee; border-radius:7px;
+    padding:6px 10px; font-family:inherit; width:170px; font-size:13px; }
+  #statusbar { position:absolute; bottom:0; left:0; right:0; height:34px; background:#1b1b1b;
+    border-top:2px solid #333; display:flex; align-items:center; gap:22px; padding:0 16px;
+    font-size:12px; color:#aaa; z-index:10; }
+  #statusbar b { color:#00ffcc; font-weight:normal; }
+  #badge { position:absolute; bottom:44px; left:14px; background:#000a; border:1px solid #444;
+    color:#888; border-radius:7px; padding:3px 10px; font-size:11px; z-index:10; }
+  canvas { position:absolute; top:52px; left:0; cursor:crosshair; }
+  #help { position:absolute; top:64px; right:12px; background:#000c; border:1px solid #333;
+    border-radius:10px; padding:12px 16px; font-size:12px; line-height:2.1; color:#bbb; z-index:9; max-width:250px; }
+  #help b { color:#00ffcc; font-weight:normal; }
+  #hint { position:absolute; top:64px; left:50%; transform:translateX(-50%);
+    background:#00ffcc22; border:1px solid #00ffcc; color:#00ffcc; border-radius:9px;
+    padding:8px 20px; font-size:13px; z-index:11; display:none; }
+</style>
+</head>
+<body>
+
+<div id="topbar">
+  <span class="logo">HOVI</span>
+  <input id="projName" placeholder="نام پروژه" value="پروژه بدون نام">
+  <div class="sep"></div>
+  <button class="tool-btn active" id="btnSelect">🖱 انتخاب</button>
+  <button class="tool-btn" id="btnWall">📐 دیوار</button>
+  <button class="tool-btn" id="btnDoor">🚪 درب</button>
+  <button class="tool-btn" id="btnWindow">🪟 پنجره</button>
+  <button class="tool-btn" id="btnCalib">🎯 کالیبراسیون</button>
+  <button class="tool-btn" id="btnPlanImg">🖼 عکس پلان</button>
+  <div class="sep"></div>
+  <button class="tool-btn" id="btnUndo">↩ برگشت</button>
+  <button class="tool-btn" id="btnDelete">🗑 حذف</button>
+  <div class="sep"></div>
+  <button class="tool-btn" id="btnSave">💾 ذخیره</button>
+  <button class="tool-btn" id="btnLoad">📂 بازکردن</button>
+  <div class="sep"></div>
+  <button class="tool-btn" id="btnExport">🏗 ساخت تور</button>
+  <input type="file" id="filePlan" accept="image/*" hidden>
+  <input type="file" id="fileJson" accept=".json,application/json" hidden>
+</div>
+
+<canvas id="cv"></canvas>
+
+<div id="help">
+  <b>راهنما:</b><br>
+  📐 دیوار: کلیک اول/دوم — ترسیم زنجیره‌ای<br>
+  راست‌کلیک/Esc پایان زنجیره<br>
+  <b>Shift</b> قفل گونیا · <b>Alt</b> بدون مگنت سرِ دیوار<br>
+  🚪 درب / 🪟 پنجره: کلیک روی دیوار<br>
+  🖱 انتخاب: کلیک روی دیوار یا درب/پنجره، کشیدن=جابه‌جایی<br>
+  <b>Del</b> حذف · <b>Ctrl+Z</b> برگشت<br>
+  چرخ ماوس: زوم · درگ وسط/Space: جابه‌جایی نما<br>
+  🎯 کالیبراسیون: دو کلیک روی فاصله معلوم پلان
+</div>
+<div id="hint"></div>
+<div id="badge">editor-v9</div>
+
+<div id="statusbar">
+  <span>مختصات: <b id="stCoord">—</b></span>
+  <span>طول: <b id="stLen">—</b></span>
+  <span>دیوارها: <b id="stCount">۰</b></span>
+  <span>بازشوها: <b id="stOpen">۰</b></span>
+  <span>مقیاس: <b id="stScale">کالیبره نشده</b></span>
+</div>
+
+<script>
+'use strict';
+// ============================================================
+// HOVI editor v1 — ویرایشگر نقشه ۲بعدی (تک‌فایل، آفلاین)
+// اسکیما: /root/hovi/schema-v1.json — دیوار=[x,z]×۲، یک منبع حقیقت
+// نگاشت بوم: screenX→world.x ، screenY→world.z (قرارداد مینی‌مپ تور)
+// ============================================================
+const SNAP=0.5, MAGNET=0.35, WALL_T=0.2, WALL_H=2.8;
+const cv=document.getElementById('cv'), ctx=cv.getContext('2d');
+
+const proj={ name:'پروژه بدون نام',
+  plan:{src:null, anchorA:null, anchorB:null, meters:null},
+  walls:[], doors:[], nextId:1 };
+let planImg=null, planScale=null; // متر بر پیکسل عکس
+let planOff={x:0,z:0};                    // جابه‌جایی عکس پلان (متر)
+const lockedIds=new Set();               // قفل‌شده‌ها: wall/door ids یا '__plan__'
+const view={x:0,y:0,zoom:60};     // zoom = پیکسل صفحه بر متر
+
+let tool='select', chainPt=null, calibStep=0, selId=null,
+    dragInfo=null, panning=false, lastMouse={x:0,y:0},
+    mouseWorld={x:0,z:0};
+const undoStack=[];
+
+// ---------- تبدیل مختصات ----------
+function W2S(p){ return [p.x*view.zoom+view.x, p.z*view.zoom+view.y]; }
+function S2W(sx,sy){ return {x:(sx-view.x)/view.zoom, z:(sy-view.y)/view.zoom}; }
+
+// ---------- اسنپ: آهنربا به انتهای دیوارها، وگرنه شبکه؛ Alt=خاموش ----------
+function snapPoint(w, alt){
+  if(alt) return {x:w.x, z:w.z};
+  let best=null, bestD=MAGNET;
+  for(const wl of proj.walls){
+    for(const pt of [wl.a, wl.b]){
+      const d=Math.hypot(w.x-pt[0], w.z-pt[1]);
+      if(d<bestD){ bestD=d; best=pt; }
+    }
+  }
+  if(best) return {x:best[0], z:best[1]};
+  return {x:w.x, z:w.z}; // بدون گرید — دقیقاً همان نقطهٔ کلیک
+}
+function orthoLock(from, to){ // Shift: قفل افقی/عمودی
+  const dx=Math.abs(to.x-from.x), dz=Math.abs(to.z-from.z);
+  return dx>=dz ? {x:to.x, z:from.z} : {x:from.x, z:to.z};
+}
+
+// ---------- Undo: استک واحد برای رسم/حذف/جابه‌جایی ----------
+function mkSnap(){ return JSON.stringify({walls:proj.walls,doors:proj.doors,nextId:proj.nextId,planOff}); }
+function pushUndo(){ undoStack.push(mkSnap());
+  if(undoStack.length>60) undoStack.shift(); }
+function pushUndoRaw(origObj){ if(!origObj.planOff) origObj.planOff=planOff;
+  undoStack.push(JSON.stringify(origObj));
+  if(undoStack.length>60) undoStack.shift(); }
+function pushUndoSnap(s){ undoStack.push(s);
+  if(undoStack.length>60) undoStack.shift(); }
+function undo(){ const s=undoStack.pop(); if(!s) return flash('چیزی برای برگشت نیست');
+  const o=JSON.parse(s); proj.walls=o.walls; proj.doors=o.doors||[]; proj.nextId=o.nextId;
+  if(o.planOff) planOff={x:o.planOff.x,z:o.planOff.z};
+  if(selId && selId!=='__plan__' && !proj.walls.find(w=>w.id===selId) && !proj.doors.find(d=>d.id===selId)) selId=null; refresh(); }
+
+// ---------- ابزارها ----------
+function setTool(t){
+  tool=t; chainPt=null; calibStep=0;
+  document.querySelectorAll('.tool-btn')[0].classList.toggle('active',t==='select');
+  btnWall.classList.toggle('active',t==='wall');
+  btnDoor.classList.toggle('active',t==='door');
+  btnWindow.classList.toggle('active',t==='window');
+  btnCalib.classList.toggle('active',t==='calib');
+  cv.style.cursor = t==='select'?'default':'crosshair';
+projName.addEventListener('input',()=>{ proj.name=projName.value||'پروژه بدون نام'; refresh(); });
+  const hints={select:'ابزار انتخاب — روی دیوار یا درب/پنجره کلیک کن',
+    wall:'کلیک اول: شروع دیوار', calib:'کلیک اول: سرِ فاصلهٔ معلوم',
+    door:'کلیک روی یک دیوار: نصب درب', window:'کلیک روی یک دیوار: نصب پنجره'};
+  showHint(hints[t]);
+}
+
+cv.addEventListener('mousedown', e=>{
+  const r=cv.getBoundingClientRect(), sx=e.clientX-r.left, sy=e.clientY-r.top;
+  const w=S2W(sx,sy);
+  if(e.button===1 || spaceHeld){ panning=true; dragInfo={sx,sy,vx:view.x,vy:view.y}; return; }
+  if(e.button===2){ // راست‌کلیک: لغو/پایان زنجیره یا لغو انتخاب
+    if(tool==='wall'){ chainPt=null; showHint('زنجیره تمام شد'); }
+    else { selId=null; refresh(); } return;
+  }
+  if(e.button!==0) return;
+
+  if(tool==='wall'){
+    const sp=snapPoint(w, e.altKey);
+    const locked=(chainPt&&shiftHeld)?orthoLock(chainPt,sp):sp;
+    if(!chainPt){ chainPt=locked; showHint('کلیک دوم: انتهای دیوار'); }
+    else{
+      if(Math.hypot(locked.x-chainPt.x,locked.z-chainPt.z)>=0.1){
+        pushUndo();
+        proj.walls.push({id:'w'+(proj.nextId++), a:[chainPt.x,chainPt.z], b:[locked.x,locked.z]});
+        chainPt=locked; // زنجیره ادامه دارد
+      }
+      refresh();
+    }
+  }
+  else if(tool==='calib'){
+    if(calibStep===0){ proj.plan.anchorA={px:[w.x,w.z]}; calibStep=1;
+      showHint('کلیک دوم: تهِ فاصلهٔ معلوم'); }
+    else{
+      proj.plan.anchorB={px:[w.x,w.z]};
+      const m=prompt('طول واقعی این فاصله چند متر است؟','1');
+      if(m && +m>0){ proj.plan.meters=+m;
+        const d=Math.hypot(proj.plan.anchorB.px[0]-proj.plan.anchorA.px[0],
+                           proj.plan.anchorB.px[1]-proj.plan.anchorA.px[1]);
+        planScale = d>0 ? (+m)/d : null;
+        showHint(planScale?('مقیاس ثبت شد ✓'):('خط صفر — دوباره'));
+        if(!planScale){ calibStep=1; } else { setTool('select'); }
+      } else { calibStep=0; showHint('لغو شد'); }
+    }
+    refresh();
+  }
+  else if(tool==='door'||tool==='window'){
+    const hit=pickWall(sx,sy);
+    if(!hit){ showHint('اول باید یک دیوار باشه'); return; }
+    const [ax,az]=hit.a,[bx,bz]=hit.b;
+    const L=Math.hypot(bx-ax,bz-az), ow=(tool==='door'?0.9:1.2);
+    if(L<ow+0.05){ showHint('دیوار کوتاه‌تر از بازشوست'); return; }
+    let u=((w.x-ax)*(bx-ax)+(w.z-az)*(bz-az))/(L*L);
+    u=Math.max((ow/2)/L, Math.min(1-(ow/2)/L, u));
+    pushUndo();
+    const nid='o'+(proj.nextId++);
+    proj.doors.push({id:nid, wallId:hit.id, type:tool, t:u*L, w:ow});
+    selId=nid; // نمایش همان چیزی که ساخته شد
+    showHint((tool==='door'?'درب':'پنجره')+' نصب شد — با درگ جابجا کن، Del حذف');
+    refresh();
+  }
+  else{ // select
+    let hit;
+    const op=pickOpening(sx,sy);
+    if(op){ selId=op.id;
+      if(lockedIds.has(op.id)){ dragInfo=null; }
+      else dragInfo={type:'open', id:op.id, orig:JSON.parse(mkSnap()), moved:false}; }
+    else if((hit=pickWall(sx,sy))){ selId=hit.id;
+      if(lockedIds.has(hit.id)){ dragInfo=null; }
+      else dragInfo={type:'move', start:w, orig:{a:[...hit.a],b:[...hit.b]}, origSnap:mkSnap(), moved:false}; }
+    else if(planImg){
+      const r=planRect();
+      if(sx>=r.x&&sx<=r.x+r.w&&sy>=r.y&&sy<=r.y+r.h){
+        selId='__plan__';
+        dragInfo=lockedIds.has('__plan__')?null:{type:'plan', start:w, orig:{x:planOff.x,z:planOff.z}, origSnap:mkSnap(), moved:false};
+      } else selId=null;
+    }
+    else selId=null;
+    refresh();
+  }
+});
+
+let lastSX=0, lastSY=0;
+cv.addEventListener('mousemove', e=>{
+  const r=cv.getBoundingClientRect(), sx=e.clientX-r.left, sy=e.clientY-r.top;
+  lastSX=sx; lastSY=sy;
+  mouseWorld=S2W(sx,sy);
+  stCoord.textContent=`${mouseWorld.x.toFixed(2)} , ${mouseWorld.z.toFixed(2)}`;
+  if(panning&&dragInfo){ view.x=dragInfo.vx+(sx-dragInfo.sx); view.y=dragInfo.vy+(sy-dragInfo.sy); }
+  else if(dragInfo&&dragInfo.type==='move'&&selId){
+    if(lockedIds.has(selId)){ dragInfo=null; return; }
+    const wl=proj.walls.find(x=>x.id===selId); if(!wl) return;
+    let dx=mouseWorld.x-dragInfo.start.x, dz=mouseWorld.z-dragInfo.start.z;
+    const na=[dragInfo.orig.a[0]+dx, dragInfo.orig.a[1]+dz], nb=[dragInfo.orig.b[0]+dx, dragInfo.orig.b[1]+dz];
+    if((na[0]!==wl.a[0]||na[1]!==wl.a[1]||nb[0]!==wl.b[0]||nb[1]!==wl.b[1])){ dragInfo.moved=true; }
+    wl.a=na; wl.b=nb;
+  }
+  else if(dragInfo&&dragInfo.type==='plan'){
+    let dx=mouseWorld.x-dragInfo.start.x, dz=mouseWorld.z-dragInfo.start.z;
+    const nx=dragInfo.orig.x+dx, nz=dragInfo.orig.z+dz;
+    if(nx!==planOff.x||nz!==planOff.z){ planOff={x:nx,z:nz}; dragInfo.moved=true; }
+  }
+  else if(dragInfo&&dragInfo.type==='open'){
+    const op=proj.doors.find(x=>x.id===dragInfo.id); if(!op) return;
+    if(lockedIds.has(op.id)){ dragInfo=null; return; }
+    const wl=wallById(op.wallId); if(!wl) return;
+    const [ax,az]=wl.a,[bx,bz]=wl.b;
+    const L=Math.hypot(bx-ax,bz-az)||1;
+    let u=((mouseWorld.x-ax)*(bx-ax)+(mouseWorld.z-az)*(bz-az))/(L*L);
+    u=Math.max((op.w/2)/L, Math.min(1-(op.w/2)/L, u));
+    const nt=u*L; if(nt!==op.t){ op.t=nt; dragInfo.moved=true; }
+  }
+  if(tool==='wall'&&chainPt){
+    let sp=snapPoint(mouseWorld,e.altKey);
+    if(shiftHeld) sp=orthoLock(chainPt,sp);
+    stLen.textContent=Math.hypot(sp.x-chainPt.x,sp.z-chainPt.z).toFixed(2)+' m';
+  } else if(tool!=='wall') stLen.textContent='—';
+  refresh();
+});
+window.addEventListener('mouseup', ()=>{
+  if(dragInfo&&dragInfo.moved){
+    if(dragInfo.type==='plan'||dragInfo.type==='move'){ pushUndoSnap(dragInfo.origSnap); }
+    else if(dragInfo.orig){ pushUndoRaw(dragInfo.orig); }
+  }
+  panning=false; dragInfo=null; });
+
+cv.addEventListener('wheel', e=>{ e.preventDefault();
+  const f=e.deltaY<0?1.15:1/1.15, nz=Math.min(400,Math.max(8,view.zoom*f));
+  const k=nz/view.zoom;
+  view.x=lastMouseOffset(e).x-(lastMouseOffset(e).x-view.x)*k;
+  view.y=e.clientY-cv.getBoundingClientRect().top-(e.clientY-cv.getBoundingClientRect().top-view.y)*k;
+  view.zoom=nz; refresh(); },{passive:false});
+function lastMouseOffset(e){ return {x:e.clientX-cv.getBoundingClientRect().left, y:e.clientY-cv.getBoundingClientRect().top}; }
+
+let shiftHeld=false, spaceHeld=false;
+window.addEventListener('keydown', e=>{
+  if(e.target.tagName==='INPUT') return;
+  shiftHeld=e.shiftKey; spaceHeld=(e.code==='Space'); if(spaceHeld) e.preventDefault();
+  if(e.key==='Escape'){ setTool(tool); selId=null; refresh(); }
+  if((e.key==='Delete')&&selId){
+    if(lockedIds.has(selId)){ flash('این مورد قفل است — اول با Z بازش کن'); return; }
+    pushUndo();
+    if(proj.doors.some(d=>d.id===selId)) proj.doors=proj.doors.filter(d=>d.id!==selId);
+    else { proj.walls=proj.walls.filter(x=>x.id!==selId); proj.doors=proj.doors.filter(d=>d.wallId!==selId); }
+    selId=null; refresh();
+  }
+  if(e.ctrlKey&&e.key==='z'){ e.preventDefault(); undo(); }
+  if((e.key==='z'||e.key==='Z')&&!e.ctrlKey){
+    if(!selId){ flash('اول یک چیز را انتخاب کن'); }
+    else if(lockedIds.has(selId)){ lockedIds.delete(selId); flash('قفل باز شد'); }
+    else { lockedIds.add(selId); flash('قفل شد 🔒 — با Z دوباره باز کن'); }
+    refresh(); return;
+  }
+  if(e.key==='1') setTool('select'); if(e.key==='2') setTool('wall'); if(e.key==='3') setTool('calib');
+  if(e.key==='4') setTool('door'); if(e.key==='5') setTool('window');
+});
+window.addEventListener('keyup', e=>{ shiftHeld=e.shiftKey; if(e.code==='Space') spaceHeld=false; });
+cv.addEventListener('contextmenu', e=>e.preventDefault());
+
+function pickWall(sx,sy){
+  let best=null,bestD=9/scaleF();
+  for(const wl of proj.walls){
+    const [ax,ay]=W2S({x:wl.a[0],z:wl.a[1]}), [bx,by]=W2S({x:wl.b[0],z:wl.b[1]});
+    const d=distToSeg(sx,sy,ax,ay,bx,by);
+    if(d<bestD){bestD=d;best=wl;}
+  } return best;
+}
+function scaleF(){ return 1; } // آستانه بر حسب پیکسل
+function distToSeg(px,py,x1,y1,x2,y2){
+  const L2=(x2-x1)**2+(y2-y1)**2;
+  let t=L2? ((px-x1)*(x2-x1)+(py-y1)*(y2-y1))/L2 : 0;
+  t=Math.max(0,Math.min(1,t));
+  return Math.hypot(px-(x1+t*(x2-x1)), py-(y1+t*(y2-y1)));
+}
+
+function wallById(id){ return proj.walls.find(x=>x.id===id); }
+function openingPos(op){
+  const wl=wallById(op.wallId); if(!wl) return null;
+  const [ax,az]=wl.a,[bx,bz]=wl.b;
+  const L=Math.hypot(bx-ax,bz-az)||1;
+  const uc=Math.min(Math.max(op.t/L,(op.w/2)/L), 1-(op.w/2)/L);
+  const px=ax+(bx-ax)*uc, pz=az+(bz-az)*uc;
+  return {x:px,z:pz, dx:(bx-ax)/L, dz:(bz-az)/L, nx:-(bz-az)/L, nz:(bx-ax)/L};
+}
+function pickOpening(sx,sy){
+  let best=null,bestD=15;
+  for(const op of proj.doors){
+    const P=openingPos(op); if(!P) continue;
+    const [X,Y]=W2S(P);
+    const d=Math.hypot(sx-X,sy-Y);
+    if(d<bestD){bestD=d;best=op;}
+  } return best;
+}
+
+// ---------- رسم ----------
+function resize(){ cv.width=innerWidth; cv.height=innerHeight-52; refresh(); }
+window.addEventListener('resize', resize);
+
+function refresh(){
+  ctx.fillStyle='#181818'; ctx.fillRect(0,0,cv.width,cv.height);
+  drawPlan(); drawGrid(); drawWalls(); drawOpenings(); drawPreview(); drawAnchors();
+  stCount.textContent=faNum(proj.walls.length);
+  stOpen.textContent=faNum(proj.doors.length);
+  stScale.textContent=planScale? (1/planScale).toFixed(0)+' px/m' : 'کالیبره نشده';
+}
+const faDigits=h=>String(h).replace(/\d/g,d=>'۰۱۲۳۴۵۶۷۸۹'[d]);
+function faNum(n){ return faDigits(n); }
+
+function planRect(){
+  if(!planImg) return null;
+  const s=planScale!=null?planScale:(1/60); // بدون کالیبراسیون: فرض ۶۰px/m
+  const w=planImg.width*s*view.zoom, h=planImg.height*s*view.zoom;
+  const [X,Y]=W2S({x:planOff.x,z:planOff.z});
+  return {x:X,y:Y,w,h};
+}
+function drawPlan(){
+  const r=planRect(); if(!r) return;
+  ctx.save();
+  ctx.globalAlpha=.45;
+  ctx.drawImage(planImg, r.x, r.y, r.w, r.h);
+  ctx.restore();
+  if(selId==='__plan__'){ ctx.save(); ctx.strokeStyle='#00ffcc'; ctx.setLineDash([6,4]); ctx.lineWidth=1.5;
+    ctx.strokeRect(r.x,r.y,r.w,r.h); ctx.restore(); }
+  if(lockedIds.has('__plan__')){ ctx.save(); ctx.font='16px Tahoma'; ctx.textAlign='right';
+    ctx.fillText('🔒', r.x+r.w-6, r.y+20); ctx.restore(); }
+}
+function drawGrid(){
+  const step=SNAP*view.zoom;
+  if(step<7) return;
+  ctx.strokeStyle='#232323'; ctx.lineWidth=1; ctx.beginPath();
+  for(let x=view.x%step; x<cv.width; x+=step){ ctx.moveTo(x,0); ctx.lineTo(x,cv.height); }
+  for(let y=view.y%step; y<cv.height; y+=step){ ctx.moveTo(0,y); ctx.lineTo(cv.width,y); }
+  ctx.stroke();
+}
+function drawWalls(){
+  for(const wl of proj.walls){
+    const [ax,ay]=W2S({x:wl.a[0],z:wl.a[1]}), [bx,by]=W2S({x:wl.b[0],z:wl.b[1]});
+    ctx.strokeStyle=lockedIds.has(wl.id)?'#ff9f43':(wl.id===selId?'#00ffcc':'#ddd');
+    ctx.lineWidth=Math.max(3,WALL_T*view.zoom);
+    ctx.lineCap='round';
+    ctx.beginPath(); ctx.moveTo(ax,ay); ctx.lineTo(bx,by); ctx.stroke();
+    // طول روی دیوار
+    const len=Math.hypot(wl.b[0]-wl.a[0], wl.b[1]-wl.a[1]);
+    if(view.zoom>25){
+      ctx.fillStyle=wl.id===selId?'#00ffcc':'#999';
+      ctx.font='11px Tahoma'; ctx.textAlign='center';
+      ctx.fillText(len.toFixed(2), (ax+bx)/2, (ay+by)/2-7);
+    }
+  }
+}
+function drawPreview(){
+  if((tool==='door'||tool==='window')&&tool!=='select'){
+    const hit=pickWall(lastSX,lastSY);
+    if(hit){
+      const [ax,az]=hit.a,[bx,bz]=hit.b;
+      const L=Math.hypot(bx-ax,bz-az), ow=(tool==='door'?0.9:1.2);
+      if(L>=ow+0.05){
+        let u=((mouseWorld.x-ax)*(bx-ax)+(mouseWorld.z-az)*(bz-az))/(L*L);
+        u=Math.max((ow/2)/L,Math.min(1-(ow/2)/L,u));
+        const px=ax+u*(bx-ax), pz=az+u*(bz-az);
+        const dx=(bx-ax)/L, dz=(bz-az)/L, nx=-dz, nz=dx;
+        const [cx,cy]=W2S({x:px,z:pz});
+        const hw=ow/2*view.zoom, wt=Math.max(3,WALL_T*view.zoom)+2;
+        // گپ پیش‌نمایش
+        ctx.save(); ctx.globalAlpha=.9;
+        ctx.strokeStyle='#181818'; ctx.lineWidth=wt; ctx.lineCap='butt';
+        ctx.beginPath(); ctx.moveTo(cx-dx*hw,cy-dz*hw); ctx.lineTo(cx+dx*hw,cy+dz*hw); ctx.stroke();
+        ctx.strokeStyle=tool==='door'?'#ffcc00':'#00ffcc'; ctx.lineWidth=2;
+        ctx.setLineDash([5,4]);
+        ctx.beginPath(); ctx.moveTo(cx-dx*hw-nx*wt/2,cy-dz*hw-nz*wt/2); ctx.lineTo(cx+dx*hw-nx*wt/2,cy+dz*hw-nz*wt/2);
+        ctx.moveTo(cx-dx*hw+nx*wt/2,cy-dz*hw+nz*wt/2); ctx.lineTo(cx+dx*hw+nx*wt/2,cy+dz*hw+nz*wt/2);
+        ctx.stroke(); ctx.setLineDash([]);
+        // برچسب عرض
+        ctx.fillStyle=tool==='door'?'#ffcc00':'#00ffcc'; ctx.font='12px Tahoma'; ctx.textAlign='center';
+        ctx.fillText(ow.toFixed(2)+' m', cx-nx*(wt/2+14), cy-nz*(wt/2+14));
+        ctx.restore();
+      }
+    }
+    return;
+  }
+  if(tool!=='wall'||!chainPt) return;
+  let sp=snapPoint(mouseWorld, altNow()); if(shiftHeld) sp=orthoLock(chainPt,sp);
+  const [ax,ay]=W2S(chainPt), [bx,by]=W2S(sp);
+  ctx.strokeStyle='#00ffcc88'; ctx.lineWidth=Math.max(3,WALL_T*view.zoom); ctx.lineCap='round';
+  ctx.beginPath(); ctx.moveTo(ax,ay); ctx.lineTo(bx,by); ctx.stroke();
+  ctx.fillStyle='#00ffcc'; ctx.beginPath(); ctx.arc(ax,ay,4,0,7); ctx.fill();
+}
+function altNow(){ return altKeyDown; }
+let altKeyDown=false;
+window.addEventListener('keydown',e=>{altKeyDown=e.altKey;});
+window.addEventListener('keyup',e=>{altKeyDown=e.altKey;});
+
+function drawOpenings(){
+  for(const op of proj.doors){
+    const P=openingPos(op); if(!P) continue;
+    const [cx,cy]=W2S(P);
+    const hw=op.w/2*view.zoom, wt=Math.max(3,WALL_T*view.zoom)+2;
+    // گپ روی بدنه دیوار
+    ctx.strokeStyle='#181818'; ctx.lineWidth=wt; ctx.lineCap='butt';
+    ctx.beginPath();
+    ctx.moveTo(cx-P.dx*hw,cy-P.dz*hw); ctx.lineTo(cx+P.dx*hw,cy+P.dz*hw); ctx.stroke();
+    ctx.strokeStyle=op.id===selId?'#00ffcc':'#bbb'; ctx.lineWidth=2;
+    if(op.type==='door'){
+      // نماد پلان: لنگه عمود + قوس ربع
+      const hx=cx-P.dx*hw, hy=cy-P.dz*hw;           // لولا
+      const tx=hx+P.nx*2*hw, ty=hy+P.nz*2*hw;       // نوک لنگه (باز ۹۰°)
+      ctx.beginPath(); ctx.moveTo(hx,hy); ctx.lineTo(tx,ty); ctx.stroke();
+      const ox=cx+P.dx*hw, oy=cy+P.dz*hw;           // لبه مقابل
+      let a1=Math.atan2(oy-hy,ox-hx), a2=Math.atan2(ty-hy,tx-hx);
+      const cross=(ox-hx)*(ty-hy)-(oy-hy)*(tx-hx);
+      ctx.setLineDash([4,4]);
+      ctx.beginPath();
+      ctx.arc(hx,hy,2*hw,a1,a2, cross>0); ctx.stroke();
+      ctx.setLineDash([]);
+    }else{
+      // نماد پنجره: قاب + خط میانی
+      const nx=P.nx*wt/2, nz=P.nz*wt/2, dxp=P.dx*hw, dzp=P.dz*hw;
+      ctx.beginPath();
+      ctx.moveTo(cx-dxp-nx,cy-dzp-nz); ctx.lineTo(cx+dxp-nx,cy+dzp-nz);
+      ctx.moveTo(cx-dxp+nx,cy-dzp+nz); ctx.lineTo(cx+dxp+nx,cy+dzp+nz);
+      ctx.stroke();
+      ctx.strokeStyle=op.id===selId?'#00ffcc88':'#777';
+      ctx.beginPath(); ctx.moveTo(cx-dxp,cy-dzp); ctx.lineTo(cx+dxp,cy+dzp); ctx.stroke();
+    }
+  }
+}
+function drawAnchors(){
+  if(tool!=='calib'||!proj.plan.anchorA) return;
+  const pts=[proj.plan.anchorA, proj.plan.anchorB].filter(Boolean);
+  ctx.fillStyle='#ffaa00';
+  for(const a of pts){ const [x,y]=W2S({x:a.px[0],z:a.px[1]});
+    ctx.beginPath(); ctx.arc(x,y,5,0,7); ctx.fill(); }
+  if(pts.length===2){ const [x1,y1]=W2S({x:pts[0].px[0],z:pts[0].px[1]}),
+    [x2,y2]=W2S({x:pts[1].px[0],z:pts[1].px[1]});
+    ctx.strokeStyle='#ffaa00'; ctx.setLineDash([6,4]);
+    ctx.beginPath(); ctx.moveTo(x1,y1); ctx.lineTo(x2,y2); ctx.stroke(); ctx.setLineDash([]);
+    ctx.fillStyle='#ffaa00'; ctx.font='12px Tahoma';
+    ctx.fillText(proj.plan.meters+' m', (x1+x2)/2, (y1+y2)/2-10);
+  }
+}
+
+// ---------- UI helpers ----------
+const hintEl=document.getElementById('hint'); let hintT;
+function showHint(t){ hintEl.style.display='block'; hintEl.textContent=t;
+  clearTimeout(hintT); hintT=setTimeout(()=>hintEl.style.display='none',2600); }
+function flash(t){ showHint(t); }
+
+btnSelect.onclick=()=>setTool('select');
+btnWall.onclick=()=>setTool('wall');
+btnDoor.onclick=()=>setTool('door');
+btnWindow.onclick=()=>setTool('window');
+btnCalib.onclick=()=>setTool('calib');
+btnUndo.onclick=undo;
+btnDelete.onclick=()=>{ if(!selId) return; pushUndo();
+  if(proj.doors.some(d=>d.id===selId)) proj.doors=proj.doors.filter(d=>d.id!==selId);
+  else { proj.walls=proj.walls.filter(x=>x.id!==selId); proj.doors=proj.doors.filter(d=>d.wallId!==selId); }
+  selId=null; refresh(); };
+
+btnPlanImg.onclick=()=>filePlan.click();
+filePlan.onchange=e=>{
+  const f=e.target.files[0]; if(!f) return;
+  const rd=new FileReader();
+  rd.onload=()=>{ planImg=new Image();
+    planImg.onload=()=>{ proj.name=projName.value||proj.name; refresh(); showHint('عکس پلان بارگذاری شد — حالا کالیبراسیون کن'); };
+    planImg.src=rd.result; };
+  rd.readAsDataURL(f);
+};
+
+btnSave.onclick=()=>{
+  proj.name=projName.value||proj.name;
+  const out={format:'hovi',version:1,name:proj.name,units:'m',
+    wallHeight:WALL_H,wallThickness:WALL_T,
+    plan:{src:proj.plan.src, anchorA:strip(proj.plan.anchorA), anchorB:strip(proj.plan.anchorB), meters:proj.plan.meters},
+    walls:proj.walls, doors:proj.doors, nextId:proj.nextId};
+  const blob=new Blob([JSON.stringify(out,null,1)],{type:'application/json'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download=(proj.name.replace(/\s+/g,'_')||'project')+'.hovi.json';
+  a.click();
+  showHint('ذخیره شد ✓');
+};
+function strip(a){ return a?{px:a.px}:null; }
+
+btnLoad.onclick=()=>fileJson.click();
+fileJson.onchange=e=>{
+  const f=e.target.files[0]; if(!f) return;
+  const rd=new FileReader();
+  rd.onload=()=>{
+    try{
+      const o=JSON.parse(rd.result);
+      if(o.format!=='hovi') throw 0;
+      proj.walls=o.walls||[]; proj.doors=o.doors||[];
+      proj.nextId=o.nextId||(proj.walls.length+1);
+      proj.plan=o.plan||proj.plan;
+      projName.value=o.name||'';
+      if(proj.plan.anchorA&&proj.plan.anchorB&&proj.plan.meters){
+        const d=Math.hypot(proj.plan.anchorB.px[0]-proj.plan.anchorA.px[0],
+                           proj.plan.anchorB.px[1]-proj.plan.anchorA.px[1]);
+        planScale=proj.plan.meters/d;
+        showHint('باز شد — عکس پلان را دوباره انتخاب کن تا نمایش داده شود');
+      } else showHint('باز شد ✓');
+      refresh();
+    }catch(_){ alert('فایل پروژه معتبر نیست'); }
+  };
+  rd.readAsText(f);
+};
+
+// ---------- تست API (برای هارنس headless) ----------
+window.hovi={
+  get state(){return proj;},
+  addWall(a,b){ proj.walls.push({id:'w'+(proj.nextId++),a,b}); refresh(); },
+  addOpening(wallId,type,t,w){ proj.doors.push({id:'o'+(proj.nextId++),wallId,type,t,w}); refresh(); },
+  calibrate(meters,dpx){ planScale=meters/dpx; },
+  get scale(){return planScale;},
+  serialize(){ return JSON.stringify({format:'hovi',version:1,walls:proj.walls}); },
+  dbg(){ return {selId, plan:!!planImg, off:planOff, locked:[...lockedIds]}; },
+  undoCount(){return undoStack.length;}
+};
+
+resize();
+setTool('select');
+</script>
+
+<script>
+(function(){
+  var TPL="<!DOCTYPE html><html lang=\"fa\" dir=\"rtl\"><head><meta charset=\"UTF-8\">\n<meta name=\"viewport\" content=\"width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no\">\n<title>\u0645\u062f\u0644 \u0633\u0647\u200c\u0628\u0639\u062f\u06cc \u2014 __PROJNAME__</title>\n<style>body{margin:0;overflow:hidden;font-family:Tahoma,sans-serif;background:#000}\n#blk{position:absolute;inset:0;background:rgba(0,0,0,.45);z-index:100;display:flex;align-items:center;justify-content:center;color:#fff;text-align:center;cursor:pointer;flex-direction:column}\n#st{position:absolute;bottom:10px;left:50%;transform:translateX(-50%);color:#fff;background:#000a;padding:6px 14px;border-radius:8px;font-size:13px;z-index:20;display:none}\n#bn{position:absolute;top:10px;right:10px;background:#000a;color:#0cf;border:1px solid #0cf;padding:4px 10px;border-radius:7px;font-size:12px;z-index:20}\n#tod{position:absolute;bottom:50px;left:50%;transform:translateX(-50%);background:#000c;color:#fff;padding:10px 16px;border-radius:8px;z-index:20;display:flex;align-items:center;gap:12px;font-size:14px}\n#tod input{width:220px;accent-color:#0cf}\n#tod span{min-width:55px;text-align:center}\n</style></head><body>\n<div id=\"blk\"><div style=\"font-size:20px;margin-bottom:8px\">\ud83d\udca0 __PROJNAME__</div><div>\u06a9\u0644\u06cc\u06a9 \u06a9\u0646 \u062a\u0627 \u0648\u0627\u0631\u062f \u0634\u0648\u06cc</div></div>\n<div id=\"bn\">\ud83d\udca0 __PROJNAME__</div><div id=\"st\"></div>\n<div id=\"tod\"><span id=\"todLabel\">\u0635\u0628\u062d</span><input type=\"range\" id=\"todSlider\" min=\"0\" max=\"24\" step=\"0.5\" value=\"12\"><span id=\"todVal\">\u06f1\u06f2:\u06f0\u06f0</span></div>\n<script type=\"importmap\">{\"imports\":{\"three\":\"https://fastly.jsdelivr.net/npm/three@0.160.0/build/three.module.js\",\"three/addons/\":\"https://fastly.jsdelivr.net/npm/three@0.160.0/examples/jsm/\"}}<\/script>\n<script type=\"module\">\nimport * as THREE from 'three';\nimport { PointerLockControls } from 'three/addons/controls/PointerLockControls.js';\nconst D=__HOVI_DATA__;\nconst W=0.2,H=2.8;\nconst scene=new THREE.Scene(); scene.background=new THREE.Color(0x0e0e0e);\nconst camera=new THREE.PerspectiveCamera(70,innerWidth/innerHeight,0.05,200); camera.position.set(1,1.7,1);\nconst renderer=new THREE.WebGLRenderer({antialias:true}); renderer.setSize(innerWidth,innerHeight); renderer.shadowMap.enabled=true; document.body.appendChild(renderer.domElement);\n\n// TOD state\nlet tod=12; const slider=document.getElementById('todSlider'), lbl=document.getElementById('todLabel'), val=document.getElementById('todVal');\nslider.oninput=e=>{tod=+e.target.value; updateTOD();};\nfunction updUI(){ const h=Math.floor(tod), m=Math.round((tod%1)*60); val.textContent=(h<10?'0':'')+h+':'+(m<10?'0':'')+m;\n  lbl.textContent=tod<5||tod>=20?'\u0634\u0628':(tod<7||tod>=18?'\u063a\u0631\u0648\u0628/\u0633\u062d\u0631':'\u0635\u0628\u062d'); }\nfunction updateTOD(){\n  updUI();\n  const t=(tod%24)/24; const ang=(t-0.25)*Math.PI*2;\n  const sunH=Math.sin(ang);\n  const skyMix=THREE.MathUtils.clamp((sunH+0.3)/1.3,0,1);\n  const nightCol=new THREE.Color(0x080820), dayCol=new THREE.Color(0x87ceeb);\n  scene.background=nightCol.clone().lerp(dayCol, skyMix);\n  scene.fog=new THREE.Fog(scene.background, 20, 60);\n  dirLight.position.set(50*Math.cos(ang), 50*Math.max(0.1,sunH), 50*Math.sin(ang));\n  dirLight.intensity=THREE.MathUtils.clamp(sunH*1.2, 0.1, 1.0);\n  dirLight.color.setHSL(0.1, 0.3, THREE.MathUtils.clamp(0.5+sunH*0.5, 0.3, 1));\n  ambLight.intensity=THREE.MathUtils.clamp(0.2+sunH*0.6, 0.1, 0.8);\n}\nupdUI();\n\nconst ambLight=new THREE.AmbientLight(0xffffff,0.6); scene.add(ambLight);\nconst dirLight=new THREE.DirectionalLight(0xffffff,0.8); dirLight.castShadow=true; scene.add(dirLight);\ndirLight.shadow.mapSize.set(2048,2048); dirLight.shadow.camera.near=0.5; dirLight.shadow.camera.far=150;\ndirLight.shadow.camera.left=-40; dirLight.shadow.camera.right=40; dirLight.shadow.camera.top=40; dirLight.shadow.camera.bottom=-40;\n\nlet bx0=Infinity,bx1=-Infinity,bz0=Infinity,bz1=-Infinity;\nfor(const w of D.walls){bx0=Math.min(bx0,w.a[0],w.b[0]);bx1=Math.max(bx1,w.a[0],w.b[0]);bz0=Math.min(bz0,w.a[1],w.b[1]);bz1=Math.max(bz1,w.a[1],w.b[1]);}\nconst fx=(bx0+bx1)/2, fz=(bz0+bz1)/2, fw=Math.max(1,bx1-bx0)+2, fd=Math.max(1,bz1-bz0)+2;\n\nconst floor=new THREE.Mesh(new THREE.PlaneGeometry(fw,fd),new THREE.MeshStandardMaterial({color:0xffffff,roughness:1}));floor.rotation.x=-Math.PI/2;floor.position.set(fx,0,fz);floor.receiveShadow=true;scene.add(floor);\nconst ceil=new THREE.Mesh(new THREE.PlaneGeometry(fw+1,fd+1),new THREE.MeshStandardMaterial({color:0xffffff,roughness:1,side:THREE.DoubleSide}));ceil.rotation.x=Math.PI/2;ceil.position.set(fx,H,fz);ceil.receiveShadow=true;scene.add(ceil);\n\nconst wallMat=new THREE.MeshStandardMaterial({color:0xd8d2c8,roughness:0.7});\nfunction addBox(x,y,z,lx,ly,lz,ry,mat){const m=new THREE.Mesh(new THREE.BoxGeometry(lx,ly,lz),mat);m.position.set(x,y,z);if(ry)m.rotation.y=ry;m.castShadow=true;m.receiveShadow=true;scene.add(m);return m;}\n\nfor(const w of D.walls){\n  const ax=w.a[0],az=w.a[1],bx=w.b[0],bz=w.b[1];\n  const L=Math.hypot(bx-ax,bz-az); if(L<0.01)continue;\n  const on=Math.atan2(bx-ax,bz-az); const ux=(bx-ax)/L,uz=(bz-az)/L;\n  const cuts=[0,1];\n  for(const o of (D.doors||[])) if(o.wallId===w.id){ cuts.push(o.t/L-o.w/2/L,o.t/L+o.w/2/L); }\n  cuts.sort((a,b)=>a-b);\n  for(let i=0;i<cuts.length-1;i++){\n    let a=cuts[i],b=cuts[i+1]; if(b-a<0.02)continue;\n    const ca=Math.max(0,Math.min(1,a)),cb=Math.max(0,Math.min(1,b));\n    const s0=Math.max(0,ca),s1=Math.min(1,cb);\n    const p1x=ax+(bx-ax)*s0,p1z=az+(bz-az)*s0,p2x=ax+(bx-ax)*s1,p2z=az+(bz-az)*s1;\n    addBox((p1x+p2x)/2,H/2,(p1z+p2z)/2,W,H,Math.hypot(p2x-p1x,p2z-p1z),on,wallMat);\n  }\n  for(const o of (D.doors||[])){ if(o.wallId!==w.id)continue;\n    const c=o.t/L,cx=ax+(bx-ax)*c,cz=az+(bz-az)*c,ow=o.w;\n    if(o.type==='door'){\n      addBox(cx-ux*ow/2,H/2,cz-uz*ow/2,W/2,H,0.06,on,wallMat);\n      addBox(cx+ux*ow/2,H/2,cz+uz*ow/2,W/2,H,0.06,on,wallMat);\n      addBox(cx,H-0.05,cz,W/2,H,0.06,on,wallMat);\n      addBox(cx,H/2,cz,0.05,2.1,ow,on,new THREE.MeshStandardMaterial({color:0x8a6b46,roughness:.6}));\n    }else{\n      addBox(cx-ux*ow/2,H/2-0.4,cz-uz*ow/2,W,H-0.8,0.0,on,wallMat);\n      addBox(cx+ux*ow/2,H/2-0.4,cz+uz*ow/2,W,H-0.8,0.0,on,wallMat);\n      addBox(cx,H-0.03,cz,W/2,H,0.08,on,wallMat);\n      addBox(cx,H-0.9,cz,W/2,H,0.03,on,wallMat);\n    }\n  }\n}\nconst controls=new PointerLockControls(camera,renderer.domElement);\nconst blk=document.getElementById('blk'),stt=document.getElementById('st');\nblk.addEventListener('click',()=>{controls.lock();blk.style.display='none';stt.style.display='block';});\nconst keys={};addEventListener('keydown',e=>keys[e.code]=true);addEventListener('keyup',e=>keys[e.code]=false);\nconst clock=new THREE.Clock();\nfunction anim(){requestAnimationFrame(anim);const dt=Math.min(clock.getDelta(),.05);\n  const v=new THREE.Vector3(); const sp=0.07;\n  if(keys['KeyW'])v.z-=1;if(keys['KeyS'])v.z+=1;if(keys['KeyA'])v.x-=1;if(keys['KeyD'])v.x+=1;\n  if(v.lengthSq()){v.normalize().applyQuaternion(camera.quaternion);camera.position.addScaledVector(v,sp);}\n  camera.position.y=1.7; renderer.render(scene,camera);}\nanim();\n<\/script></body></html>\nconst W=0.2,H=2.8;\nconst scene=new THREE.Scene(); scene.background=new THREE.Color(0x0e0e0e);\nconst camera=new THREE.PerspectiveCamera(70,innerWidth/innerHeight,0.05,200); camera.position.set(1,1.7,1);\nconst renderer=new THREE.WebGLRenderer({antialias:true}); renderer.setSize(innerWidth,innerHeight); renderer.shadowMap.enabled=true; document.body.appendChild(renderer.domElement);\nscene.add(new THREE.AmbientLight(0xffffff,.6));\nconst dir=new THREE.DirectionalLight(0xffffff,.8); dir.position.set(8,12,5); dir.castShadow=true; scene.add(dir);\nlet bx0=Infinity,bx1=-Infinity,bz0=Infinity,bz1=-Infinity;\nfor(const w of D.walls){bx0=Math.min(bx0,w.a[0],w.b[0]);bx1=Math.max(bx1,w.a[0],w.b[0]);bz0=Math.min(bz0,w.a[1],w.b[1]);bz1=Math.max(bz1,w.a[1],w.b[1]);}\nconst floor=new THREE.Mesh(new THREE.PlaneGeometry(Math.max(1,bx1-bx0)+2,Math.max(1,bz1-bz0)+2),new THREE.MeshStandardMaterial({color:0xffffff,roughness:1}));floor.rotation.x=-Math.PI/2;floor.position.set((bx0+bx1)/2,0,(bz0+bz1)/2);floor.receiveShadow=true;scene.add(floor);\nconst wallMat=new THREE.MeshStandardMaterial({color:0xd8d2c8});\nfunction addBox(x,y,z,lx,ly,lz,ry,mat){const m=new THREE.Mesh(new THREE.BoxGeometry(lx,ly,lz),mat);m.position.set(x,y,z);if(ry)m.rotation.y=ry;m.castShadow=true;m.receiveShadow=true;scene.add(m);return m;}\nfor(const w of D.walls){\n  const ax=w.a[0],az=w.a[1],bx=w.b[0],bz=w.b[1];\n  const L=Math.hypot(bx-ax,bz-az); if(L<0.01)continue;\n  const on=Math.atan2(bx-ax,bz-az); const ux=(bx-ax)/L,uz=(bz-az)/L;\n  const cuts=[0,1];\n  for(const o of (D.doors||[])) if(o.wallId===w.id){ cuts.push(o.t/L-o.w/2/L,o.t/L+o.w/2/L); }\n  cuts.sort((a,b)=>a-b);\n  for(let i=0;i<cuts.length-1;i++){\n    let a=cuts[i],b=cuts[i+1]; if(b-a<0.02)continue;\n    let ca=Math.max(0,Math.min(1,a)),cb=Math.max(0,Math.min(1,b));\n    const s0=Math.max(0,ca),s1=Math.min(1,cb);\n    const p1x=ax+(bx-ax)*s0,p1z=az+(bz-az)*s0,p2x=ax+(bx-ax)*s1,p2z=az+(bz-az)*s1;\n    addBox((p1x+p2x)/2,H/2,(p1z+p2z)/2,W,H,Math.hypot(p2x-p1x,p2z-p1z),on,wallMat);\n  }\n  for(const o of (D.doors||[])){ if(o.wallId!==w.id)continue;\n    const c=o.t/L,cx=ax+(bx-ax)*c,cz=az+(bz-az)*c,ow=o.w;\n    if(o.type==='door'){\n      addBox(cx-ux*ow/2,H/2,cz-uz*ow/2,W/2,H,0.06,on,wallMat);\n      addBox(cx+ux*ow/2,H/2,cz+uz*ow/2,W/2,H,0.06,on,wallMat);\n      addBox(cx,H-0.05,cz,W/2,H,0.06,on,wallMat);\n      addBox(cx,H/2,cz,0.05,2.1,ow,on,new THREE.MeshStandardMaterial({color:0x8a6b46,roughness:.6}));\n    }else{\n      addBox(cx-ux*ow/2,H/2-0.4,cz-uz*ow/2,W,H-0.8,0.0,on,wallMat);\n      addBox(cx+ux*ow/2,H/2-0.4,cz+uz*ow/2,W,H-0.8,0.0,on,wallMat);\n      addBox(cx,H-0.03,cz,W/2,H,0.08,on,wallMat);\n      addBox(cx,H-0.9,cz,W/2,H,0.03,on,wallMat);\n    }\n  }\n}\nconst controls=new PointerLockControls(camera,renderer.domElement);\nconst blk=document.getElementById('blk'),stt=document.getElementById('st');\nblk.addEventListener('click',()=>{controls.lock();blk.style.display='none';stt.style.display='block';});\nconst keys={};addEventListener('keydown',e=>keys[e.code]=true);addEventListener('keyup',e=>keys[e.code]=false);\nconst clock=new THREE.Clock();\nfunction anim(){requestAnimationFrame(anim);const dt=Math.min(clock.getDelta(),.05);\n  const v=new THREE.Vector3(); const sp=0.07;\n  if(keys['KeyW'])v.z-=1;if(keys['KeyS'])v.z+=1;if(keys['KeyA'])v.x-=1;if(keys['KeyD'])v.x+=1;\n  if(v.lengthSq()){v.normalize().applyQuaternion(camera.quaternion);camera.position.addScaledVector(v,sp);}\n  camera.position.y=1.7; renderer.render(scene,camera);}\nanim();\n<\/script></body></html>";
+  btnExport.addEventListener('click',function(){
+    if(!proj.walls.length){alert('اول چند دیوار بکش');return;}
+    var out=TPL.replace('__HOVI_DATA__',JSON.stringify(proj).replace(/</g,'\\u003c')).replace(/__PROJNAME__/g,(proj.name||'tour').replace(/</g,''));
+    var blob=new Blob([out],{type:'text/html'}),a=document.createElement('a');
+    a.href=URL.createObjectURL(blob); a.download=(proj.name||'tour').replace(/\s+/g,'_')+'_tour.html'; a.click();
+    showHint('تور ساخته شد ✓'); refresh();
+  });
+})();
+</script>
+</body>
+</html>

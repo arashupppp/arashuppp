@@ -1,0 +1,34 @@
+{
+ "format": "hovi",
+ "version": 1,
+ "name": "پروژه بدون نام",
+ "units": "m",
+ "wallHeight": 2.8,
+ "wallThickness": 0.2,
+ "plan": {
+  "src": null,
+  "image": null,
+  "anchorA": {
+   "px": null,
+   "world": null
+  },
+  "anchorB": {
+   "px": null,
+   "world": null
+  }
+ },
+ "walls": [
+  {
+   "id": "w1",
+   "a": [
+    0.0,
+    0.0
+   ],
+   "b": [
+    4.0,
+    0.0
+   ]
+  }
+ ],
+ "doors": []
+}

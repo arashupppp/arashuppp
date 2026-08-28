@@ -1,0 +1,152 @@
+<!DOCTYPE html><html lang="fa" dir="rtl"><head><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>مدل سه‌بعدی — آپارتمان نمونه</title>
+<style>body{margin:0;overflow:hidden;font-family:Tahoma,sans-serif;background:#000}
+#blk{position:absolute;inset:0;background:rgba(0,0,0,.45);z-index:100;display:flex;align-items:center;justify-content:center;color:#fff;text-align:center;cursor:pointer;flex-direction:column}
+#st{position:absolute;bottom:10px;left:50%;transform:translateX(-50%);color:#fff;background:#000a;padding:6px 14px;border-radius:8px;font-size:13px;z-index:20;display:none}
+#bn{position:absolute;top:10px;right:10px;background:#000a;color:#0cf;border:1px solid #0cf;padding:4px 10px;border-radius:7px;font-size:12px;z-index:20}
+#tod{position:absolute;bottom:50px;left:50%;transform:translateX(-50%);background:#000c;color:#fff;padding:10px 16px;border-radius:8px;z-index:20;display:flex;align-items:center;gap:12px;font-size:14px}
+#tod input{width:220px;accent-color:#0cf}
+#tod span{min-width:55px;text-align:center}
+</style></head><body>
+<div id="blk"><div style="font-size:20px;margin-bottom:8px">💠 آپارتمان نمونه</div><div>کلیک کن تا وارد شوی</div></div>
+<div id="bn">💠 آپارتمان نمونه</div><div id="st"></div>
+<div id="tod"><span id="todLabel">صبح</span><input type="range" id="todSlider" min="0" max="24" step="0.5" value="12"><span id="todVal">۱۲:۰۰</span></div>
+<script type="importmap">{"imports":{"three":"https://fastly.jsdelivr.net/npm/three@0.160.0/build/three.module.js","three/addons/":"https://fastly.jsdelivr.net/npm/three@0.160.0/examples/jsm/"}}</script>
+<script type="module">
+import * as THREE from 'three';
+import { PointerLockControls } from 'three/addons/controls/PointerLockControls.js';
+const D={"name":"آپارتمان نمونه","plan":{"src":null,"anchorA":null,"anchorB":null,"meters":null},"walls":[{"id":"w1","a":[0,0],"b":[6,0]},{"id":"w2","a":[6,0],"b":[6,5]},{"id":"w3","a":[6,5],"b":[0,5]},{"id":"w4","a":[0,5],"b":[0,0]}],"doors":[{"id":"o5","wallId":"w1","type":"door","t":1.5,"w":0.9},{"id":"o6","wallId":"w2","type":"window","t":3,"w":1.4}],"nextId":7};
+const W=0.2,H=2.8;
+const scene=new THREE.Scene(); scene.background=new THREE.Color(0x0e0e0e);
+const camera=new THREE.PerspectiveCamera(70,innerWidth/innerHeight,0.05,200); camera.position.set(1,1.7,1);
+const renderer=new THREE.WebGLRenderer({antialias:true}); renderer.setSize(innerWidth,innerHeight); renderer.shadowMap.enabled=true; document.body.appendChild(renderer.domElement);
+
+// TOD state
+let tod=12; const slider=document.getElementById('todSlider'), lbl=document.getElementById('todLabel'), val=document.getElementById('todVal');
+slider.oninput=e=>{tod=+e.target.value; updateTOD();};
+function updUI(){ const h=Math.floor(tod), m=Math.round((tod%1)*60); val.textContent=(h<10?'0':'')+h+':'+(m<10?'0':'')+m;
+  lbl.textContent=tod<5||tod>=20?'شب':(tod<7||tod>=18?'غروب/سحر':'صبح'); }
+function updateTOD(){
+  updUI();
+  const t=(tod%24)/24; const ang=(t-0.25)*Math.PI*2;
+  const sunH=Math.sin(ang);
+  const skyMix=THREE.MathUtils.clamp((sunH+0.3)/1.3,0,1);
+  const nightCol=new THREE.Color(0x080820), dayCol=new THREE.Color(0x87ceeb);
+  scene.background=nightCol.clone().lerp(dayCol, skyMix);
+  scene.fog=new THREE.Fog(scene.background, 20, 60);
+  dirLight.position.set(50*Math.cos(ang), 50*Math.max(0.1,sunH), 50*Math.sin(ang));
+  dirLight.intensity=THREE.MathUtils.clamp(sunH*1.2, 0.1, 1.0);
+  dirLight.color.setHSL(0.1, 0.3, THREE.MathUtils.clamp(0.5+sunH*0.5, 0.3, 1));
+  ambLight.intensity=THREE.MathUtils.clamp(0.2+sunH*0.6, 0.1, 0.8);
+}
+updUI();
+
+const ambLight=new THREE.AmbientLight(0xffffff,0.6); scene.add(ambLight);
+const dirLight=new THREE.DirectionalLight(0xffffff,0.8); dirLight.castShadow=true; scene.add(dirLight);
+dirLight.shadow.mapSize.set(2048,2048); dirLight.shadow.camera.near=0.5; dirLight.shadow.camera.far=150;
+dirLight.shadow.camera.left=-40; dirLight.shadow.camera.right=40; dirLight.shadow.camera.top=40; dirLight.shadow.camera.bottom=-40;
+
+let bx0=Infinity,bx1=-Infinity,bz0=Infinity,bz1=-Infinity;
+for(const w of D.walls){bx0=Math.min(bx0,w.a[0],w.b[0]);bx1=Math.max(bx1,w.a[0],w.b[0]);bz0=Math.min(bz0,w.a[1],w.b[1]);bz1=Math.max(bz1,w.a[1],w.b[1]);}
+const fx=(bx0+bx1)/2, fz=(bz0+bz1)/2, fw=Math.max(1,bx1-bx0)+2, fd=Math.max(1,bz1-bz0)+2;
+
+const floor=new THREE.Mesh(new THREE.PlaneGeometry(fw,fd),new THREE.MeshStandardMaterial({color:0xffffff,roughness:1}));floor.rotation.x=-Math.PI/2;floor.position.set(fx,0,fz);floor.receiveShadow=true;scene.add(floor);
+const ceil=new THREE.Mesh(new THREE.PlaneGeometry(fw+1,fd+1),new THREE.MeshStandardMaterial({color:0xffffff,roughness:1,side:THREE.DoubleSide}));ceil.rotation.x=Math.PI/2;ceil.position.set(fx,H,fz);ceil.receiveShadow=true;scene.add(ceil);
+
+const wallMat=new THREE.MeshStandardMaterial({color:0xd8d2c8,roughness:0.7});
+function addBox(x,y,z,lx,ly,lz,ry,mat){const m=new THREE.Mesh(new THREE.BoxGeometry(lx,ly,lz),mat);m.position.set(x,y,z);if(ry)m.rotation.y=ry;m.castShadow=true;m.receiveShadow=true;scene.add(m);return m;}
+
+for(const w of D.walls){
+  const ax=w.a[0],az=w.a[1],bx=w.b[0],bz=w.b[1];
+  const L=Math.hypot(bx-ax,bz-az); if(L<0.01)continue;
+  const on=Math.atan2(bx-ax,bz-az); const ux=(bx-ax)/L,uz=(bz-az)/L;
+  const cuts=[0,1];
+  for(const o of (D.doors||[])) if(o.wallId===w.id){ cuts.push(o.t/L-o.w/2/L,o.t/L+o.w/2/L); }
+  cuts.sort((a,b)=>a-b);
+  for(let i=0;i<cuts.length-1;i++){
+    let a=cuts[i],b=cuts[i+1]; if(b-a<0.02)continue;
+    const ca=Math.max(0,Math.min(1,a)),cb=Math.max(0,Math.min(1,b));
+    const s0=Math.max(0,ca),s1=Math.min(1,cb);
+    const p1x=ax+(bx-ax)*s0,p1z=az+(bz-az)*s0,p2x=ax+(bx-ax)*s1,p2z=az+(bz-az)*s1;
+    addBox((p1x+p2x)/2,H/2,(p1z+p2z)/2,W,H,Math.hypot(p2x-p1x,p2z-p1z),on,wallMat);
+  }
+  for(const o of (D.doors||[])){ if(o.wallId!==w.id)continue;
+    const c=o.t/L,cx=ax+(bx-ax)*c,cz=az+(bz-az)*c,ow=o.w;
+    if(o.type==='door'){
+      addBox(cx-ux*ow/2,H/2,cz-uz*ow/2,W/2,H,0.06,on,wallMat);
+      addBox(cx+ux*ow/2,H/2,cz+uz*ow/2,W/2,H,0.06,on,wallMat);
+      addBox(cx,H-0.05,cz,W/2,H,0.06,on,wallMat);
+      addBox(cx,H/2,cz,0.05,2.1,ow,on,new THREE.MeshStandardMaterial({color:0x8a6b46,roughness:.6}));
+    }else{
+      addBox(cx-ux*ow/2,H/2-0.4,cz-uz*ow/2,W,H-0.8,0.0,on,wallMat);
+      addBox(cx+ux*ow/2,H/2-0.4,cz+uz*ow/2,W,H-0.8,0.0,on,wallMat);
+      addBox(cx,H-0.03,cz,W/2,H,0.08,on,wallMat);
+      addBox(cx,H-0.9,cz,W/2,H,0.03,on,wallMat);
+    }
+  }
+}
+const controls=new PointerLockControls(camera,renderer.domElement);
+const blk=document.getElementById('blk'),stt=document.getElementById('st');
+blk.addEventListener('click',()=>{controls.lock();blk.style.display='none';stt.style.display='block';});
+const keys={};addEventListener('keydown',e=>keys[e.code]=true);addEventListener('keyup',e=>keys[e.code]=false);
+const clock=new THREE.Clock();
+function anim(){requestAnimationFrame(anim);const dt=Math.min(clock.getDelta(),.05);
+  const v=new THREE.Vector3(); const sp=0.07;
+  if(keys['KeyW'])v.z-=1;if(keys['KeyS'])v.z+=1;if(keys['KeyA'])v.x-=1;if(keys['KeyD'])v.x+=1;
+  if(v.lengthSq()){v.normalize().applyQuaternion(camera.quaternion);camera.position.addScaledVector(v,sp);}
+  camera.position.y=1.7; renderer.render(scene,camera);}
+anim();
+</script></body></html>
+const W=0.2,H=2.8;
+const scene=new THREE.Scene(); scene.background=new THREE.Color(0x0e0e0e);
+const camera=new THREE.PerspectiveCamera(70,innerWidth/innerHeight,0.05,200); camera.position.set(1,1.7,1);
+const renderer=new THREE.WebGLRenderer({antialias:true}); renderer.setSize(innerWidth,innerHeight); renderer.shadowMap.enabled=true; document.body.appendChild(renderer.domElement);
+scene.add(new THREE.AmbientLight(0xffffff,.6));
+const dir=new THREE.DirectionalLight(0xffffff,.8); dir.position.set(8,12,5); dir.castShadow=true; scene.add(dir);
+let bx0=Infinity,bx1=-Infinity,bz0=Infinity,bz1=-Infinity;
+for(const w of D.walls){bx0=Math.min(bx0,w.a[0],w.b[0]);bx1=Math.max(bx1,w.a[0],w.b[0]);bz0=Math.min(bz0,w.a[1],w.b[1]);bz1=Math.max(bz1,w.a[1],w.b[1]);}
+const floor=new THREE.Mesh(new THREE.PlaneGeometry(Math.max(1,bx1-bx0)+2,Math.max(1,bz1-bz0)+2),new THREE.MeshStandardMaterial({color:0xffffff,roughness:1}));floor.rotation.x=-Math.PI/2;floor.position.set((bx0+bx1)/2,0,(bz0+bz1)/2);floor.receiveShadow=true;scene.add(floor);
+const wallMat=new THREE.MeshStandardMaterial({color:0xd8d2c8});
+function addBox(x,y,z,lx,ly,lz,ry,mat){const m=new THREE.Mesh(new THREE.BoxGeometry(lx,ly,lz),mat);m.position.set(x,y,z);if(ry)m.rotation.y=ry;m.castShadow=true;m.receiveShadow=true;scene.add(m);return m;}
+for(const w of D.walls){
+  const ax=w.a[0],az=w.a[1],bx=w.b[0],bz=w.b[1];
+  const L=Math.hypot(bx-ax,bz-az); if(L<0.01)continue;
+  const on=Math.atan2(bx-ax,bz-az); const ux=(bx-ax)/L,uz=(bz-az)/L;
+  const cuts=[0,1];
+  for(const o of (D.doors||[])) if(o.wallId===w.id){ cuts.push(o.t/L-o.w/2/L,o.t/L+o.w/2/L); }
+  cuts.sort((a,b)=>a-b);
+  for(let i=0;i<cuts.length-1;i++){
+    let a=cuts[i],b=cuts[i+1]; if(b-a<0.02)continue;
+    let ca=Math.max(0,Math.min(1,a)),cb=Math.max(0,Math.min(1,b));
+    const s0=Math.max(0,ca),s1=Math.min(1,cb);
+    const p1x=ax+(bx-ax)*s0,p1z=az+(bz-az)*s0,p2x=ax+(bx-ax)*s1,p2z=az+(bz-az)*s1;
+    addBox((p1x+p2x)/2,H/2,(p1z+p2z)/2,W,H,Math.hypot(p2x-p1x,p2z-p1z),on,wallMat);
+  }
+  for(const o of (D.doors||[])){ if(o.wallId!==w.id)continue;
+    const c=o.t/L,cx=ax+(bx-ax)*c,cz=az+(bz-az)*c,ow=o.w;
+    if(o.type==='door'){
+      addBox(cx-ux*ow/2,H/2,cz-uz*ow/2,W/2,H,0.06,on,wallMat);
+      addBox(cx+ux*ow/2,H/2,cz+uz*ow/2,W/2,H,0.06,on,wallMat);
+      addBox(cx,H-0.05,cz,W/2,H,0.06,on,wallMat);
+      addBox(cx,H/2,cz,0.05,2.1,ow,on,new THREE.MeshStandardMaterial({color:0x8a6b46,roughness:.6}));
+    }else{
+      addBox(cx-ux*ow/2,H/2-0.4,cz-uz*ow/2,W,H-0.8,0.0,on,wallMat);
+      addBox(cx+ux*ow/2,H/2-0.4,cz+uz*ow/2,W,H-0.8,0.0,on,wallMat);
+      addBox(cx,H-0.03,cz,W/2,H,0.08,on,wallMat);
+      addBox(cx,H-0.9,cz,W/2,H,0.03,on,wallMat);
+    }
+  }
+}
+const controls=new PointerLockControls(camera,renderer.domElement);
+const blk=document.getElementById('blk'),stt=document.getElementById('st');
+blk.addEventListener('click',()=>{controls.lock();blk.style.display='none';stt.style.display='block';});
+const keys={};addEventListener('keydown',e=>keys[e.code]=true);addEventListener('keyup',e=>keys[e.code]=false);
+const clock=new THREE.Clock();
+function anim(){requestAnimationFrame(anim);const dt=Math.min(clock.getDelta(),.05);
+  const v=new THREE.Vector3(); const sp=0.07;
+  if(keys['KeyW'])v.z-=1;if(keys['KeyS'])v.z+=1;if(keys['KeyA'])v.x-=1;if(keys['KeyD'])v.x+=1;
+  if(v.lengthSq()){v.normalize().applyQuaternion(camera.quaternion);camera.position.addScaledVector(v,sp);}
+  camera.position.y=1.7; renderer.render(scene,camera);}
+anim();
+</script></body></html>
