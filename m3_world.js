@@ -112,6 +112,23 @@ function createWorld(container, DATA, onSync, onHint){
     const lw=Math.max(...xs)-Math.min(...xs), ld=Math.max(...zs)-Math.min(...zs);
     addBox(cx,H/2,cz,lw,H,ld,0,new THREE.MeshStandardMaterial({color:0x9a9a9a,roughness:.8}));
   }
+  for(const s of (DATA.stairs||[])){
+    const ax=s.a[0],az=s.a[1],bx=s.b[0],bz=s.b[1];
+    const dx=bx-ax,dz=bz-az,L=Math.hypot(dx,dz);
+    if(!(L>0.05))continue;
+    const ry=Math.atan2(-(dz),dx); // rotation.y برای BoxGeometry (x به x، z به -z)
+    const hw=(s.w||1)/2, Hs=s.h||2.8, n=Math.max(2,Math.round(Hs/0.18));
+    const tread=L/n, rise=Hs/n;
+    const smat=new THREE.MeshStandardMaterial({color:0xb0b0b0,roughness:.75});
+    for(let i=0;i<n;i++){
+      const cx=ax+dx*(i+0.5)/n, cz=az+dz*(i+0.5)/n, top=(i+1)*rise;
+      addBox(cx,top/2,cz,tread,top,(s.w||1),ry,smat);
+    }
+  }
+  for(const ev of (DATA.elevs||[])){
+    const EW=ev.w||1.6, ED=ev.d||1.7;
+    addBox(ev.x,H/2,ev.z,ED,H,EW,(ev.rot||0),new THREE.MeshStandardMaterial({color:0x8a8f94,roughness:.6}));
+  }
 
   // ==== کنترل ====
   // کنترل دستی: pointer lock + yaw/pitch (بدون PLC — سازگار با file://)
