@@ -112,17 +112,45 @@ function createWorld(container, DATA, onSync, onHint){
     const lw=Math.max(...xs)-Math.min(...xs), ld=Math.max(...zs)-Math.min(...zs);
     addBox(cx,H/2,cz,lw,H,ld,0,new THREE.MeshStandardMaterial({color:0x9a9a9a,roughness:.8}));
   }
-  for(const s of (DATA.stairs||[])){
-    const ax=s.a[0],az=s.a[1],bx=s.b[0],bz=s.b[1];
+    const addRun=(a,b,w,i0,n,Hs)=>{
+    const ax=a[0],az=a[1],bx=b[0],bz=b[1];
     const dx=bx-ax,dz=bz-az,L=Math.hypot(dx,dz);
-    if(!(L>0.05))continue;
-    const ry=Math.atan2(-(dz),dx); // rotation.y برای BoxGeometry (x به x، z به -z)
-    const hw=(s.w||1)/2, Hs=s.h||2.8, n=Math.max(2,Math.round(Hs/0.18));
+    if(!(L>0.05))return;
+    const ry=Math.atan2(-(dz),dx);
     const tread=L/n, rise=Hs/n;
     const smat=new THREE.MeshStandardMaterial({color:0xb0b0b0,roughness:.75});
     for(let i=0;i<n;i++){
-      const cx=ax+dx*(i+0.5)/n, cz=az+dz*(i+0.5)/n, top=(i+1)*rise;
-      addBox(cx,top/2,cz,tread,top,(s.w||1),ry,smat);
+      const cx=ax+dx*(i+0.5)/n, cz=az+dz*(i+0.5)/n, top=Hs*(i0+i+1)/Math.max(1,n);
+      addBox(cx,top/2,cz,tread,top,w,ry,smat);
+    }
+  };
+  for(const s of (DATA.stairs||[])){
+    const Hs=s.h||2.8, n=Math.max(2,Math.round(Hs/0.18));
+    if(s.type==='straight'){
+      addRun(s.a,s.b,s.w||1,0,n,Hs);
+    } else if(s.type==='L'){
+      const L1=Math.hypot(s.b[0]-s.a[0],s.b[1]-s.a[1]);
+      const L2=Math.hypot(s.c[0]-s.b[0],s.c[1]-s.b[1]);
+      const n1=Math.max(1,Math.round(n*L1/(L1+L2)));
+      addRun(s.a,s.b,s.w||1,0,n1,Hs);
+      addRun(s.b,s.c,s.w||1,n1,n-n1,Hs);
+    } else if(s.type==='U'){
+      const L1=Math.hypot(s.b[0]-s.a[0],s.b[1]-s.a[1]);
+      const L2=Math.hypot(s.c[0]-s.b[0],s.c[1]-s.b[1]);
+      const n1=Math.max(1,Math.round(n*L1/(L1+L2)));
+      addRun(s.a,s.b,s.w||1,0,n1,Hs);
+      addRun(s.c,s.b,s.w||1,n1,n-n1,Hs);
+    } else if(s.type==='spiral'){
+      const R=s.r||0.9, turn=s.turn||1, nP=Math.max(10,Math.round(n*0.7));
+      const sweep=Math.PI*1.75*turn;
+      const smat=new THREE.MeshStandardMaterial({color:0xb0b0b0,roughness:.75});
+      const rIn=R*0.18, rMid=(R+rIn)/2, span=R-rIn;
+      for(let i=0;i<nP;i++){
+        const a0=sweep*i/nP, a1=sweep*(i+1)/nP, top=Hs*(i+1)/nP;
+        const am=(a0+a1)/2;
+        const cx=s.a[0]+rMid*Math.cos(am), cz=s.a[1]+rMid*Math.sin(am);
+        addBox(cx,top/2,cz,span*0.95, top, span*0.4, -am+(turn>0?Math.PI/2:-Math.PI/2), smat);
+      }
     }
   }
   for(const ev of (DATA.elevs||[])){
