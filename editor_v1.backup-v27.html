@@ -3,15 +3,15 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>ویرایشگر HOVI — نسخه editor-v28</title>
+<title>ویرایشگر HOVI — نسخه editor-v23</title>
 <style>
   * { margin:0; padding:0; box-sizing:border-box; }
   body { font-family:Tahoma,sans-serif; background:#141414; color:#eee; overflow:hidden; }
   #topbar { position:absolute; top:0; left:0; right:0; height:52px; background:#1b1b1b;
-    border-bottom:2px solid #333; display:flex; align-items:center; gap:10px; padding:0 14px; z-index:10; overflow:hidden; }
+    border-bottom:2px solid #333; display:flex; align-items:center; gap:10px; padding:0 14px; z-index:10; }
   #topbar .logo { font-weight:bold; color:#00ffcc; font-size:17px; margin-left:6px; }
   .tool-btn { background:#262626; color:#ddd; border:2px solid #444; border-radius:9px;
-    padding:5px 12px; cursor:pointer; font-family:inherit; font-size:13px; transition:.15s; max-height:40px; line-height:1.2; }
+    padding:7px 16px; cursor:pointer; font-family:inherit; font-size:13px; transition:.15s; }
   .tool-btn:hover { border-color:#666; }
   .tool-btn.active { background:#00ffcc22; border-color:#00ffcc; color:#00ffcc; }
   .sep { width:2px; height:28px; background:#333; margin:0 4px; }
@@ -50,7 +50,6 @@
       <button class="doormi" data-t="double">🚪🚪 دولنگه (۱۵۰cm)</button>
       <button class="doormi" data-t="slide">➡️ کشویی (۱۲۰cm)</button>
       <button class="doormi" data-t="open">⬜ بازشوی بدون درب (۱۲۰cm)</button>
-      <button class="doormi" data-t="free">↔ درب بین‌دیواری (دو سر جدا)</button>
     </div>
   </div>
   <div style="position:relative;display:inline-block">
@@ -79,7 +78,6 @@
     <button class="tool-btn" id="btnElev">⬛ آسانسور</button>
   </div>
   <button class="tool-btn" id="btnColumn">█ ستون</button>
-  <button class="tool-btn" id="btnFillet">⬠ 倒角</button>
   <button class="tool-btn" id="btn3D">🖥 حالت ۳د</button>
   <button class="tool-btn" id="btnCalib">🎯 کالیبراسیون</button>
   <button class="tool-btn" id="btnPlanImg">🖼 عکس پلان</button>
@@ -119,7 +117,7 @@
   🎯 کالیبراسیون: دو کلیک روی فاصله معلوم پلان
 </div>
 <div id="hint"></div>
-<div id="badge">editor-v28</div>
+<div id="badge">editor-v23</div>
 
 <div id="statusbar">
   <span>مختصات: <b id="stCoord">—</b></span>
@@ -141,7 +139,7 @@ const cv=document.getElementById('cv'), ctx=cv.getContext('2d');
 
 const proj={ name:'پروژه بدون نام',
   plan:{src:null, anchorA:null, anchorB:null, meters:null},
-  walls:[], doors:[], columns:[], stairs:[], elevs:[], wells:[], balcs:[], rails:[], zones:[], fillets:[], nextId:1 };
+  walls:[], doors:[], columns:[], stairs:[], elevs:[], wells:[], balcs:[], rails:[], zones:[], nextId:1 };
 let planImg=null, planScale=null; // متر بر پیکسل عکس
 let colPts=[];             // ۴ گوشهٔ ستون در حال کشیدن
 let stairPts=[];
@@ -149,13 +147,10 @@ let wellPts=[];           // نورباز: ۲ کلیک (گوشه اول/گوشه
 let balcPts=[];           // بالکن: گوشه‌های چندضلعی (≥۳) — Enter/dblclick بستن
 let zonePts=[];           // ناحیه: گوشه‌های چندضلعی (≥۳) — Enter/dblclick بستن
 let railPts=[];           // نرده: نقاط شکست polyline (≥۲) — راست‌کلیک پایان
-let freeDoorPtA=null;      // درب آزاد: نقطه اول (سر دیوار A)
-let filletPts=[];          // فیلت: ۲ نقطه گوشه برای شعاع
 let spiralDir=1;           // جهت چرخش مارپیچ: +1 پادساعتگرد، -1 ساعتگرد
 let elevRot=0;             // چرخش پیش‌نمایش آسانسور (۹۰° پله‌ای)
 const ELEV_W=1.6, ELEV_D=1.7, ELEV_CAB_W=1.0, ELEV_CAB_D=1.2;
 const STAIR_TREAD=0.28, STAIR_RISE=0.18, STAIR_H=2.8;
-const FILLET_RADIUS=0.3;
 let colAngle=0;            // زاویهٔ ستون (رادیان) — با Space چرخش
 let planOff={x:0,z:0};                    // جابه‌جایی عکس پلان (متر)
 const lockedIds=new Set();               // قفل‌شده‌ها: wall/door ids یا '__plan__'
@@ -204,7 +199,7 @@ function orthoLock(from, to){ // Shift: قفل افقی/عمودی
 }
 
 // ---------- Undo: استک واحد برای رسم/حذف/جابه‌جایی ----------
-function mkSnap(){ return JSON.stringify({walls:proj.walls,doors:proj.doors,columns:proj.columns,stairs:proj.stairs,elevs:proj.elevs,wells:proj.wells,balcs:proj.balcs,rails:proj.rails,zones:proj.zones,fillets:proj.fillets,nextId:proj.nextId,planOff}); }
+function mkSnap(){ return JSON.stringify({walls:proj.walls,doors:proj.doors,columns:proj.columns,stairs:proj.stairs,elevs:proj.elevs,wells:proj.wells,balcs:proj.balcs,rails:proj.rails,zones:proj.zones,nextId:proj.nextId,planOff}); }
 function pushUndo(){ undoStack.push(mkSnap());
   if(undoStack.length>60) undoStack.shift(); }
 function pushUndoRaw(origObj){ if(!origObj.planOff) origObj.planOff=planOff;
@@ -213,7 +208,7 @@ function pushUndoRaw(origObj){ if(!origObj.planOff) origObj.planOff=planOff;
 function pushUndoSnap(s){ undoStack.push(s);
   if(undoStack.length>60) undoStack.shift(); }
 function undo(){ const s=undoStack.pop(); if(!s) return flash('چیزی برای برگشت نیست');
-  const o=JSON.parse(s); proj.walls=o.walls; proj.doors=o.doors||[]; proj.columns=o.columns||[]; proj.stairs=o.stairs||[]; proj.elevs=o.elevs||[]; proj.wells=o.wells||[]; proj.balcs=o.balcs||[]; proj.rails=o.rails||[]; proj.zones=o.zones||[]; proj.fillets=o.fillets||[]; proj.nextId=o.nextId;
+  const o=JSON.parse(s); proj.walls=o.walls; proj.doors=o.doors||[]; proj.columns=o.columns||[]; proj.stairs=o.stairs||[]; proj.elevs=o.elevs||[]; proj.wells=o.wells||[]; proj.balcs=o.balcs||[]; proj.rails=o.rails||[]; proj.zones=o.zones||[]; proj.nextId=o.nextId;
   if(o.planOff) planOff={x:o.planOff.x,z:o.planOff.z};
   if(selId && selId!=='__plan__' && !proj.walls.find(w=>w.id===selId) && !proj.doors.find(d=>d.id===selId) && !proj.stairs.find(s=>s.id===selId) && !proj.elevs.find(x=>x.id===selId) && !proj.balcs.find(b=>b.id===selId) && !proj.zones.find(z=>z.id===selId) && !proj.rails.find(r=>r.id===selId)) selId=null; refresh(); }
 
@@ -232,7 +227,6 @@ function setTool(t){
   btnBalc.classList.toggle('active',t==='balc');
   btnZone.classList.toggle('active',t==='zone');
   btnRail.classList.toggle('active',t==='rail');
-  if(document.getElementById('btnFillet')) btnFillet.classList.toggle('active',t==='fillet');
   if(t!=='column'){ colPts=[]; }
   if(t!=='stair'){ stairPts=[]; } else { stairType = stairType||'straight'; }
   if(t!=='elev'){ elevRot=0; }
@@ -240,8 +234,6 @@ function setTool(t){
   if(t!=='balc'){ balcPts=[]; }
   if(t!=='zone'){ zonePts=[]; }
   if(t!=='rail'){ railPts=[]; }
-  if(t!=='freeDoor'){ freeDoorPtA=null; }
-  if(t!=='fillet'){ filletPts=[]; }
   cv.style.cursor = t==='select'?'default':'crosshair';
 projName.addEventListener('input',()=>{ proj.name=projName.value||'پروژه بدون نام'; refresh(); });
   const hints={select:'ابزار انتخاب — روی دیوار یا درب/پنجره کلیک کن',
@@ -531,52 +523,6 @@ cv.addEventListener('mousedown', e=>{
     showHint('نقطهٔ '+railPts.length+' ثبت شد — راست‌کلیک: پایان (حداقل ۲)');
     refresh();
   }
-  else if(tool==='fillet'){
-    const sp=snapPoint(w, e.altKey);
-    filletPts.push([sp.x, sp.z]);
-    if(filletPts.length===2){
-      pushUndo();
-      const nid='f'+(proj.nextId++);
-      proj.fillets.push({id:nid, a:filletPts[0], b:filletPts[1], r:FILLET_RADIUS});
-      filletPts=[];
-      selId=nid;
-      showHint('فیلت ساخته شد — درگ برای جابجایی، دابل‌کلیک برای ویرایش');
-    } else showHint('نقطه دوم فیلت؟');
-    refresh();
-  }
-  else if(tool==='freeDoor'){
-    // درب آزاد: کلیک اول=سر A، دوم=سر B (مگنت سر دیوار)
-    const sp=snapPoint(w, e.altKey);
-    if(!freeDoorPtA){
-      freeDoorPtA=[sp.x,sp.z];
-      showHint('نقطه دوم دهانه را کلیک کنید (راست‌کلیک=لغو)');
-    } else {
-      const ptB=freeDoorPtA;
-      const wallHit=pickWall(sx,sy);
-      let endPt=[sp.x,sp.z];
-      if(wallHit){
-        const wl=proj.walls.find(x=>x.id===wallHit.id);
-        if(wl){
-          const [ax,az]=wl.a,[bx,bz]=wl.b;
-          const dx=bx-ax,dz=bz-az,L=Math.hypot(dx,dz);
-          const t=((sp.x-ax)*dx+(sp.z-az)*dz)/(L*L);
-          const cx=Math.max(0,Math.min(1,t));
-          endPt=[ax+dx*cx, az+dz*cx];
-        }
-      }
-      const dAB=Math.hypot(endPt[0]-ptB[0], endPt[1]-ptB[1]);
-      if(endPt[0]===ptB[0]&&endPt[1]===ptB[1]||dAB<0.15){ showHint('دو نقطه خیلی نزدیک‌اند'); }
-      else{
-        pushUndo();
-        const nid='d'+(proj.nextId++);
-        proj.doors.push({id:nid, type:'free', a:ptB, b:endPt, w:0.9});
-        freeDoorPtA=null;
-        selId=nid;
-        showHint('درب بین‌دیواری نصب شد ✓ — Del حذف، درگ جابجایی، دابل‌کلیک ویرایش');
-      }
-    }
-    refresh();
-  }
   else{ // select
     let hit, op;
     const co=pickColumn(sx,sy);
@@ -586,9 +532,6 @@ cv.addEventListener('mousedown', e=>{
     else if((hit=pickStairW(w))){ selId=hit.id;
       if(lockedIds.has(hit.id)){ dragInfo=null; }
       else dragInfo={type:'stair', start:w, orig:{a:[...hit.a], b:hit.b?[...hit.b]:null, c:hit.c?[...hit.c]:null}, origSnap:mkSnap(), moved:false}; }
-    else if((hit=pickElevEdge(w))){ selId=hit.ev.id;
-      if(lockedIds.has(hit.ev.id)){ dragInfo=null; }
-      else dragInfo={type:'elev-resize', id:hit.ev.id, edge:hit.edge, corner:hit.corner, start:w, orig:{x:hit.ev.x,z:hit.ev.z,w:hit.ev.w||ELEV_W,d:hit.ev.d||ELEV_D}, origSnap:mkSnap(), moved:false}; }
     else if((hit=pickElevW(w))){ selId=hit.id;
       if(lockedIds.has(hit.id)){ dragInfo=null; }
       else dragInfo={type:'elev', start:w, orig:{x:hit.x,z:hit.z}, origSnap:mkSnap(), moved:false}; }
@@ -604,9 +547,6 @@ cv.addEventListener('mousedown', e=>{
     else if((hit=pickRailW(w))){ selId=hit.id;
       if(lockedIds.has(hit.id)){ dragInfo=null; }
       else dragInfo={type:'rail', start:w, orig:{pts:hit.pts.map(p=>[...p])}, origSnap:mkSnap(), moved:false}; }
-    else if((hit=pickFilletW(w))){ selId=hit.id;
-      if(lockedIds.has(hit.id)){ dragInfo=null; }
-      else dragInfo={type:'fillet', start:w, orig:{a:[...hit.a],b:[...hit.b],r:hit.r}, origSnap:mkSnap(), moved:false}; }
     else if((op=pickOpening(sx,sy))){ selId=op.id;
       if(lockedIds.has(op.id)){ dragInfo=null; }
       else dragInfo={type:'open', id:op.id, orig:JSON.parse(mkSnap()), moved:false}; }
@@ -683,44 +623,6 @@ else if(dragInfo&&dragInfo.type==='plan'){
     const nx2=dragInfo.orig.x+(mouseWorld.x-dragInfo.start.x), nz2=dragInfo.orig.z+(mouseWorld.z-dragInfo.start.z);
     if(nx2!==ev.x||nz2!==ev.z){ ev.x=nx2; ev.z=nz2; dragInfo.moved=true; }
   }
-  else if(dragInfo&&dragInfo.type==='elev-resize'&&selId){
-    if(lockedIds.has(selId)){ dragInfo=null; return; }
-    const ev=proj.elevs.find(x=>x.id===selId); if(!ev) return;
-    const dx=mouseWorld.x-dragInfo.start.x, dz=mouseWorld.z-dragInfo.start.z;
-    const rot=ev.rot||0;
-    // Transform drag delta to elevator local coords
-    const ldx=dx*Math.cos(rot)+dz*Math.sin(rot);
-    const ldz=-dx*Math.sin(rot)+dz*Math.cos(rot);
-    // Use global keyboard state
-    const altHeld = altKeyDown;
-    const isShift = shiftHeld;
-    // Simple resize logic: edge-based
-    // Alt = center fixed (uniform from center), Shift = 10cm snap
-    const origW=dragInfo.orig.w, origD=dragInfo.orig.d;
-    const origX=dragInfo.orig.x, origZ=dragInfo.orig.z;
-    let newW=origW, newD=origD, newX=origX, newZ=origZ;
-    if(dragInfo.edge==='north'){
-      // North edge at x - d/2
-      if(altHeld){ newD=Math.max(1,origD-ldz*2); newX=origX; }  // center fixed
-      else { newD=Math.max(1,origD-ldz); newX=origX-ldz/2; }  // south edge fixed
-    } else if(dragInfo.edge==='south'){
-      // South edge at x + d/2
-      if(altHeld){ newD=Math.max(1,origD+ldz*2); newX=origX; }  // center fixed
-      else { newD=Math.max(1,origD+ldz); newX=origX+ldz/2; }  // north edge fixed
-    } else if(dragInfo.edge==='east'){
-      // East edge at z + w/2
-      if(altHeld){ newW=Math.max(1,origW+ldx*2); newZ=origZ; }  // center fixed
-      else { newW=Math.max(1,origW+ldx); newZ=origZ+ldx/2; }  // west edge fixed
-    } else if(dragInfo.edge==='west'){
-      // West edge at z - w/2
-      if(altHeld){ newW=Math.max(1,origW-ldx*2); newZ=origZ; }  // center fixed
-      else { newW=Math.max(1,origW-ldx); newZ=origZ-ldx/2; }  // east edge fixed
-    }
-    // Shift snap to 10cm
-    if(isShift){ newW=Math.round(newW*10)/10; newD=Math.round(newD*10)/10; }
-    ev.w=newW; ev.d=newD; ev.x=newX; ev.z=newZ;
-    dragInfo.moved=true;
-  }
   if(dragInfo&&dragInfo.type==='well'&&selId){
     if(lockedIds.has(selId)){ dragInfo=null; return; }
     const wl=proj.wells.find(x=>x.id===selId); if(!wl) return;
@@ -758,7 +660,7 @@ else if(dragInfo&&dragInfo.type==='plan'){
 });
 window.addEventListener('mouseup', ()=>{
   if(dragInfo&&dragInfo.moved){
-    if(dragInfo.type==='plan'||dragInfo.type==='move'||dragInfo.type==='elev-resize'){ pushUndoSnap(dragInfo.origSnap); }
+    if(dragInfo.type==='plan'||dragInfo.type==='move'){ pushUndoSnap(dragInfo.origSnap); }
     else if(dragInfo.orig){ pushUndoRaw(dragInfo.orig); }
   }
   panning=false; dragInfo=null; });
@@ -788,7 +690,7 @@ cv.addEventListener('dblclick', e=>{
   const r=cv.getBoundingClientRect(), sx=e.clientX-r.left, sy=e.clientY-r.top;
   const op=pickOpening(sx,sy);
   if(!op) return;
-  if(op.type==='door'||op.type==='double'||op.type==='slide'||op.type==='open'||op.type==='free'){
+  if(op.type==='door'||op.type==='double'||op.type==='slide'||op.type==='open'){
     openDoorEdit(op); return;
   }
   const nv=prompt('عرض جدید پنجره (متر):', op.w.toFixed(2));
@@ -803,17 +705,10 @@ cv.addEventListener('dblclick', e=>{
 });
 
 function openDoorEdit(op){
-  // For free doors, L is distance between a and b; for wall doors, L is wall length
-  let L;
-  if(op.type==='free'){
-    L=Math.hypot(op.b[0]-op.a[0], op.b[1]-op.a[1]);
-  } else {
-    const wl=wallById(op.wallId);
-    L=wl?Math.hypot(wl.b[0]-wl.a[0],wl.b[1]-wl.a[1]):op.w+0.2;
-  }
+  const wl=wallById(op.wallId); const L=wl?Math.hypot(wl.b[0]-wl.a[0],wl.b[1]-wl.a[1]):op.w+0.2;
   const p=document.createElement('div');
   p.style.cssText='position:fixed;top:70px;left:50%;transform:translateX(-50%);z-index:60;background:#111;border:1px solid #00ffcc66;border-radius:12px;padding:14px 18px;color:#ddd;font-size:13px;box-shadow:0 10px 40px #000d;min-width:290px';
-  const types=[['door','تک‌لنگه'],['double','دولنگه'],['slide','کشویی'],['open','بدون درب (بازشو)'],['free','درب بین‌دیواری']];
+  const types=[['door','تک‌لنگه'],['double','دولنگه'],['slide','کشویی'],['open','بدون درب (بازشو)']];
   p.innerHTML='<b style="color:#00ffcc">ویرایش درب</b><br><br>'+
     '<div style="display:flex;gap:6px;margin-bottom:10px">'+
       types.map(t=>'<button class="dtbtn" data-t="'+t[0]+'" style="padding:7px 10px;border-radius:8px;border:1px solid #345;background:'+(op.type===t[0]?'#00ffcc33':'#1a1a1a')+';color:'+(op.type===t[0]?'#00ffcc':'#ccc')+';cursor:pointer;font-family:inherit">'+t[1]+'</button>').join('')+
@@ -821,33 +716,34 @@ function openDoorEdit(op){
     '<label>عرض: <input id="dw" type="number" step="0.05" min="0.6" value="'+op.w.toFixed(2)+'" style="width:70px;background:#000;border:1px solid #345;color:#fff;padding:4px;border-radius:6px"> متر</label><br><br>'+
     (op.type==='door'||op.type==='double'?
       '<label>جهت بازشو: <button class="dsbtn" id="dswing" style="padding:5px 12px;border-radius:8px;border:1px solid #345;background:#1a1a1a;color:#ccc;cursor:pointer;font-family:inherit">'+((op.swing||1)===1?'داخل ↘':'خارج ↖')+'</button></label> '+
-      '<label style="margin-right:10px">سمت لولا: <button class="dsbtn" id="dhinge" style="padding:5px 12px;border-radius:8px;border:1px solid #345;background:#1a1a1a;color:#ccc;cursor:pointer;font-family:inherit">'+((op.hinge||1)===1?'چپ':'راست')+'</button></label><br><br>'
-    :'')+
+      '<label style="margin-right:10px">سمت لولا: <button class="dsbtn" id="dhinge" style="padding:5px 12px;border-radius:8px;border:1px solid #345;background:#1a1a1a;color:#ccc;cursor:pointer;font-family:inherit">'+((op.hinge||1)===1?'چپ':'راست')+'</button></label><br><br>':'')+
     '<button id="dok" style="padding:7px 22px;border-radius:8px;border:1px solid #00ffcc;background:#00ffcc22;color:#00ffcc;cursor:pointer;font-family:inherit">تأیید</button> '+
     '<button id="dcx" style="padding:7px 14px;border-radius:8px;border:1px solid #345;background:#1a1a1a;color:#999;cursor:pointer;font-family:inherit">بستن</button>';
   document.body.appendChild(p);
   let tmpType=op.type;
   p.querySelectorAll('.dtbtn').forEach(b=>{
-  b.onclick=()=>{ tmpType=b.dataset.t;
-  p.querySelectorAll('.dtbtn').forEach(x=>{x.style.background='#1a1a1a';x.style.color='#ccc';});
-  b.style.background='#00ffcc33'; b.style.color='#00ffcc';
-  const rows=p.querySelectorAll('.dsbtn');
-  rows.forEach(x=>x.parentElement.style.display=(tmpType==='door'||tmpType==='double')?'inline':'none');
-  };
+    b.onclick=()=>{ tmpType=b.dataset.t;
+      p.querySelectorAll('.dtbtn').forEach(x=>{x.style.background='#1a1a1a';x.style.color='#ccc';});
+      b.style.background='#00ffcc33'; b.style.color='#00ffcc';
+      const rows=p.querySelectorAll('.dsbtn');
+      rows.forEach(x=>x.parentElement.style.display=(tmpType==='door'||tmpType==='double')?'inline':'none');
+    };
   });
   const swb=p.querySelector('#dswing');
   if(swb) swb.onclick=()=>{ op.swing=-(op.swing||1); swb.textContent=(op.swing===1?'داخل ↘':'خارج ↖'); };
   const hgb=p.querySelector('#dhinge');
   if(hgb) hgb.onclick=()=>{ op.hinge=-(op.hinge||1); hgb.textContent=(op.hinge===1?'چپ':'راست'); };
   p.querySelector('#dok').onclick=()=>{
-  pushUndo();
-  op.type=tmpType;
-  const nv=+p.querySelector('#dw').value;
-  if(nv>0.3){ const def=DOOR_DEF[tmpType]; op.w=Math.min(nv, def.max, L-0.05); }
-  p.remove(); refresh(); showHint('درب ویرایش شد ✓');
+    pushUndo();
+    op.type=tmpType;
+    const nv=+p.querySelector('#dw').value;
+    if(nv>0.3){ const def=DOOR_DEF[tmpType]; op.w=Math.min(nv, def.max, L-0.05); }
+    p.remove(); refresh(); showHint('درب ویرایش شد ✓');
   };
   p.querySelector('#dcx').onclick=()=>p.remove();
-}function openStairEdit(st){
+}
+
+function openStairEdit(st){
   const p=document.createElement('div');
   p.style.cssText='position:fixed;top:70px;left:50%;transform:translateX(-50%);z-index:60;background:#111;border:1px solid #00ffcc66;border-radius:12px;padding:14px 18px;color:#ddd;font-size:13px;box-shadow:0 10px 40px #000d;min-width:340px';
   const types=[['straight','مستقیم'],['L','دربست L'],['U','دربست U'],['J','دربست J'],['spiral','مارپیچ']];
@@ -992,7 +888,7 @@ window.addEventListener('keydown', e=>{
   if((stPanelOpen||zonePanelOpen)&&e.key!=='Escape'){ if(e.key===' '||e.key.toLowerCase()==='r'||e.key.toLowerCase()==='f'||e.key==='Delete'||e.key==='Backspace') e.preventDefault(); return; }
   if(e.target.tagName==='INPUT') return;
   shiftHeld=e.shiftKey; spaceHeld=(e.code==='Space'); if(spaceHeld) e.preventDefault();
-  if(e.key==='Escape'){ if(tool==='stair'&&stairPts.length){ stairPts=[]; showHint('نصب پله لغو شد'); } if(tool==='rail'&&railPts.length>=2){ finishRail(); return; } if(tool==='freeDoor'){ freeDoorPtA=null; showHint('درب آزاد لغو شد'); } if(tool==='balc'&&balcPts.length>=3){ finishBalc(); return; } if(tool==='zone'&&zonePts.length>=3){ finishZone(); return; } setTool('select'); selId=null; refresh(); }
+  if(e.key==='Escape'){ if(tool==='stair'&&stairPts.length){ stairPts=[]; showHint('نصب پله لغو شد'); } if(tool==='rail'&&railPts.length>=2){ finishRail(); return; } if(tool==='balc'&&balcPts.length>=3){ finishBalc(); return; } if(tool==='zone'&&zonePts.length>=3){ finishZone(); return; } setTool('select'); selId=null; refresh(); }
   if(e.key==='Enter'&&tool==='balc'){ e.preventDefault(); finishBalc(); }
   if(e.key==='Enter'&&tool==='zone'){ e.preventDefault(); finishZone(); }
   if((e.key==='Delete')&&selId){
@@ -1006,7 +902,6 @@ window.addEventListener('keydown', e=>{
     else if(proj.balcs.some(x=>x.id===selId)) proj.balcs=proj.balcs.filter(x=>x.id!==selId);
     else if(proj.zones.some(x=>x.id===selId)) proj.zones=proj.zones.filter(x=>x.id!==selId);
     else if(proj.rails.some(x=>x.id===selId)) proj.rails=proj.rails.filter(x=>x.id!==selId);
-    else if(proj.fillets.some(x=>x.id===selId)) proj.fillets=proj.fillets.filter(x=>x.id!==selId);
     else { proj.walls=proj.walls.filter(x=>x.id!==selId); proj.doors=proj.doors.filter(d=>d.wallId!==selId); }
     selId=null; refresh();
   }
@@ -1098,13 +993,6 @@ function distToSeg(px,py,x1,y1,x2,y2){
 
 function wallById(id){ return proj.walls.find(x=>x.id===id); }
 function openingPos(op){
-  if(op.type==='free'){
-    // Free door: midpoint of a/b
-    const [ax,az]=op.a,[bx,bz]=op.b;
-    const L=Math.hypot(bx-ax,bz-az)||1;
-    const px=(ax+bx)/2, pz=(az+bz)/2;
-    return {x:px,z:pz, dx:(bx-ax)/L, dz:(bz-az)/L, nx:-(bz-az)/L, nz:(bx-ax)/L};
-  }
   const wl=wallById(op.wallId); if(!wl) return null;
   const [ax,az]=wl.a,[bx,bz]=wl.b;
   const L=Math.hypot(bx-ax,bz-az)||1;
@@ -1116,29 +1004,18 @@ function pickOpening(sx,sy){
   let best=null,bestD=18;
   for(const op of proj.doors){
     const P=openingPos(op); if(!P) continue;
-    if(op.type==='free'){
-      // Free door: use a/b directly, no wallId
-      const [ax,ay]=W2S({x:op.a[0],z:op.a[1]}), [bx,by]=W2S({x:op.b[0],z:op.b[1]});
-      const L=Math.hypot(bx-ax,by-ay); if(!L) continue;
-      const ux=(bx-ax)/L, uy=(by-ay)/L;
-      const hw=op.w/2*view.zoom;
-      const cx=ax+ux*(L/2), cy=ay+uy*(L/2);  // L is already in screen pixels
-      const rx=sx-cx, ry=sy-cy;
-      let tt=rx*ux+ry*uy; tt=Math.max(-hw,Math.min(hw,tt));
-      const d=Math.hypot(rx-ux*tt, ry-uy*tt);
-      if(d<bestD){bestD=d;best=op;}
-    } else {
-      const wl=wallById(op.wallId); if(!wl) continue;
-      const [ax,ay]=W2S({x:wl.a[0],z:wl.a[1]}), [bx,by]=W2S({x:wl.b[0],z:wl.b[1]});
-      const L=Math.hypot(bx-ax,by-ay); if(!L) continue;
-      const ux=(bx-ax)/L, uy=(by-ay)/L;
-      const hw=op.w/2*view.zoom;
-      const cx=ax+ux*op.t*view.zoom, cy=ay+uy*op.t*view.zoom;
-      const rx=sx-cx, ry=sy-cy;
-      let tt=rx*ux+ry*uy; tt=Math.max(-hw,Math.min(hw,tt));
-      const d=Math.hypot(rx-ux*tt, ry-uy*tt);
-      if(d<bestD){bestD=d;best=op;}
-    }
+    const wl=wallById(op.wallId); if(!wl) continue;
+    const [ax,ay]=W2S({x:wl.a[0],z:wl.a[1]}), [bx,by]=W2S({x:wl.b[0],z:wl.b[1]});
+    const L=Math.hypot(bx-ax,by-ay); if(!L) continue;
+    const ux=(bx-ax)/L, uy=(by-ay)/L;
+    // قطعهٔ بازشو روی صفحه: از مرکز به دو طرف op.w/2
+    const hw=op.w/2*view.zoom;
+    const cx=ax+ux*op.t*view.zoom, cy=ay+uy*op.t*view.zoom;
+    // فاصلهٔ نقطه از قطعه [c-hw, c+hw]
+    const rx=sx-cx, ry=sy-cy;
+    let tt=rx*ux+ry*uy; tt=Math.max(-hw,Math.min(hw,tt));
+    const d=Math.hypot(rx-ux*tt, ry-uy*tt);
+    if(d<bestD){bestD=d;best=op;}
   } return best;
 }
 
@@ -1228,27 +1105,6 @@ function pickElevW(w){
   }
   return null;
 }
-function pickElevEdge(w){
-  for(const ev of (proj.elevs||[])){
-    const dx=w.x-ev.x, dz=w.z-ev.z, rot=-(ev.rot||0);
-    const lx=dx*Math.cos(rot)-dz*Math.sin(rot), lz=dx*Math.sin(rot)+dz*Math.cos(rot);
-    const EW=(ev.w||ELEV_W), ED=(ev.d||ELEV_D);
-    const halfW=EW/2, halfD=ED/2;
-    const tol=0.12; // ~0.12m tolerance in world coords
-    // lx = local X (depth axis), lz = local Z (width axis)
-    // north = -halfD, south = +halfD, east = +halfW, west = -halfW
-    if(Math.abs(lx+halfD)<=tol) return {ev,edge:'north'};
-    if(Math.abs(lx-halfD)<=tol) return {ev,edge:'south'};
-    if(Math.abs(lz-halfW)<=tol) return {ev,edge:'east'};
-    if(Math.abs(lz+halfW)<=tol) return {ev,edge:'west'};
-    // Corners
-    if(Math.abs(lx+halfD)<=tol && Math.abs(lz-halfW)<=tol) return {ev,corner:'ne'};
-    if(Math.abs(lx+halfD)<=tol && Math.abs(lz+halfW)<=tol) return {ev,corner:'nw'};
-    if(Math.abs(lx-halfD)<=tol && Math.abs(lz-halfW)<=tol) return {ev,corner:'se'};
-    if(Math.abs(lx-halfD)<=tol && Math.abs(lz+halfW)<=tol) return {ev,corner:'sw'};
-  }
-  return null;
-}
 function pickWellW(w){
   for(const wl of (proj.wells||[])){
     if(w.x>=wl.a[0]-0.05&&w.x<=wl.b[0]+0.05&&w.z>=wl.a[1]-0.05&&w.z<=wl.b[1]+0.05) return wl;
@@ -1264,15 +1120,6 @@ function pickBalcW(w){
 function pickZoneW(w){
   for(const z of (proj.zones||[])){
     if(pointInPoly([w.x,w.z], z.pts)) return z;
-  }
-  return null;
-}
-function pickFilletW(w){
-  for(const f of (proj.fillets||[])){
-    // Fillet corner is between f.a and f.b - check distance to the corner point
-    // The corner is at f.a (first point clicked), check distance to it
-    if(Math.hypot(w.x-f.a[0], w.z-f.a[1]) < 0.5) return f;
-    if(Math.hypot(w.x-f.b[0], w.z-f.b[1]) < 0.5) return f;
   }
   return null;
 }
@@ -2000,7 +1847,6 @@ function flash(t){ showHint(t); }
 btnSelect.onclick=()=>setTool('select');
 btnWall.onclick=()=>setTool('wall');
 btnColumn.onclick=()=>setTool('column');
-btnFillet.onclick=()=>setTool('fillet');
 btnWell.onclick=()=>setTool('well');
 btnBalc.onclick=()=>setTool('balc');
 btnZone.onclick=()=>setTool('zone');
@@ -2077,7 +1923,6 @@ document.querySelectorAll('.doormi').forEach(b=>{
     e.stopPropagation();
     doorType=b.dataset.t;
     document.getElementById('doorMenu').style.display='none';
-    if(doorType==='free'){ setTool('freeDoor'); showHint('درب بین‌دیواری: کلیک سر دیوار A، سپس سر دیوار B (Q)'); return; }
     setTool('door');
     showHint(DOOR_DEF[doorType].label+' — کلیک روی دیوار؛ بازشو: دابل‌کلیک = تغییر نوع/ابعاد/جهت/لولا');
   };
@@ -2135,8 +1980,7 @@ const DOOR_DEF={
   door:  {label:'درب تک‌لنگه', w:0.9,  max:1.2},
   double:{label:'درب دولنگه', w:1.5,  max:1.8},
   slide: {label:'درب کشویی', w:1.2,  max:2.4},
-  open:  {label:'بازشوی بدون درب', w:1.2, max:2.4},
-  free:  {label:'درب بین‌دیواری', w:0.9, max:2.4}
+  open:  {label:'بازشوی بدون درب', w:1.2, max:2.4}
 };
 let doorType='door';
 let win2={}; // حالت ۲کلیکی: {wallId, t0} یا مقدار اول
@@ -2150,8 +1994,6 @@ btnDelete.onclick=()=>{ if(!selId) return; pushUndo();
     else if(proj.wells.some(x=>x.id===selId)) proj.wells=proj.wells.filter(x=>x.id!==selId);
   else if(proj.balcs.some(x=>x.id===selId)) proj.balcs=proj.balcs.filter(x=>x.id!==selId);
   else if(proj.rails.some(x=>x.id===selId)) proj.rails=proj.rails.filter(x=>x.id!==selId);
-  else if(proj.zones.some(x=>x.id===selId)) proj.zones=proj.zones.filter(x=>x.id!==selId);
-  else if(proj.fillets.some(x=>x.id===selId)) proj.fillets=proj.fillets.filter(x=>x.id!==selId);
   else { proj.walls=proj.walls.filter(x=>x.id!==selId); proj.doors=proj.doors.filter(d=>d.wallId!==selId); }
   selId=null; refresh(); };
 
@@ -2170,7 +2012,7 @@ btnSave.onclick=()=>{
   const out={format:'hovi',version:1,name:proj.name,units:'m',
     wallHeight:WALL_H,wallThickness:WALL_T,
     plan:{src:proj.plan.src, anchorA:strip(proj.plan.anchorA), anchorB:strip(proj.plan.anchorB), meters:proj.plan.meters},
-    walls:proj.walls, doors:proj.doors, columns:proj.columns, stairs:proj.stairs, elevs:proj.elevs, wells:proj.wells||[], balcs:proj.balcs||[], rails:proj.rails||[], zones:proj.zones||[], fillets:proj.fillets||[], nextId:proj.nextId};
+    walls:proj.walls, doors:proj.doors, columns:proj.columns, stairs:proj.stairs, elevs:proj.elevs, wells:proj.wells||[], balcs:proj.balcs||[], rails:proj.rails||[], zones:proj.zones||[], nextId:proj.nextId};
   const blob=new Blob([JSON.stringify(out,null,1)],{type:'application/json'});
   const a=document.createElement('a');
   a.href=URL.createObjectURL(blob);
@@ -2188,7 +2030,7 @@ fileJson.onchange=e=>{
     try{
       const o=JSON.parse(rd.result);
       if(o.format!=='hovi') throw 0;
-      proj.walls=o.walls||[]; proj.doors=o.doors||[]; proj.columns=o.columns||[]; proj.stairs=o.stairs||[]; proj.elevs=o.elevs||[]; proj.wells=o.wells||[]; proj.balcs=o.balcs||[]; proj.rails=o.rails||[]; proj.zones=o.zones||[]; proj.fillets=o.fillets||[];
+      proj.walls=o.walls||[]; proj.doors=o.doors||[]; proj.columns=o.columns||[]; proj.stairs=o.stairs||[]; proj.elevs=o.elevs||[]; proj.wells=o.wells||[]; proj.balcs=o.balcs||[]; proj.rails=o.rails||[]; proj.zones=o.zones||[];
       proj.nextId=o.nextId||(proj.walls.length+1);
       proj.plan=o.plan||proj.plan;
       projName.value=o.name||'';
