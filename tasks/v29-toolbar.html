@@ -1,0 +1,113 @@
+  <button class="tool-btn active" id="btnSelect">🖱 انتخاب</button>
+  <div class="sep"></div>
+  <!-- سکشن ۱: سازه -->
+  <div class="sec-wrap">
+    <button class="tool-btn sec-btn" id="btnStruct">🏗 سازه ▾</button>
+    <div class="sec-drop" id="structDrop">
+      <button id="btnWall">📐 دیوار</button>
+      <button id="btnColumn">█ ستون</button>
+      <button id="btnFillet">⬠ 倒角</button>
+      <button id="btnWell">☀️ نورباز</button>
+      <button id="btnBalc">⬒ بالکن</button>
+      <button id="btnZone">⬚ ناحیه</button>
+    </div>
+  </div>
+  <div class="sep"></div>
+  <!-- سکشن ۲: بازشوها -->
+  <div class="sec-wrap">
+    <button class="tool-btn sec-btn" id="btnOpenings">🚪 بازشوها ▾</button>
+    <div class="sec-drop" id="openingsDrop">
+      <div style="position:relative">
+        <button id="btnDoor" style="direction:rtl">🚪 درب ▸</button>
+        <div id="doorMenu" style="display:none;position:absolute;top:0;right:100%;background:#1a1a2e;border:1px solid #00ffcc44;border-radius:8px;min-width:210px;z-index:51;padding:4px 0">
+          <button class="doormi" data-t="door">🚪 تک‌لنگه (۹۰cm)</button>
+          <button class="doormi" data-t="double">🚪🚪 دولنگه (۱۵۰cm)</button>
+          <button class="doormi" data-t="slide">➡️ کشویی (۱۲۰cm)</button>
+          <button class="doormi" data-t="open">⬜ بازشوی بدون درب (۱۲۰cm)</button>
+          <button class="doormi" data-t="free">↔ درب بین‌دیواری (دو سر جدا)</button>
+        </div>
+      </div>
+      <div style="position:relative">
+        <button id="btnWindow" style="direction:rtl">🪟 پنجره ▸</button>
+        <div id="winMenu" style="display:none;position:absolute;top:0;right:100%;background:#1a1a2e;border:1px solid #00ffcc44;border-radius:8px;min-width:190px;z-index:51;padding:4px 0">
+          <button class="winmi" data-m="click">🖱 نصب با یک کلیک (سریع)</button>
+          <button class="winmi" data-m="2click">📏 نصب با ۲ کلیک (ابتدا/انتها)</button>
+          <button class="winmi" data-m="resize">🔢 تغییر سایز پنجره (دابل‌کلیک)</button>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="sep"></div>
+  <!-- سکشن ۳: اتصالات -->
+  <div class="sec-wrap">
+    <button class="tool-btn sec-btn" id="btnConnect">🪜 اتصالات ▾</button>
+    <div class="sec-drop" id="connectDrop">
+      <div style="position:relative">
+        <button id="btnStair" style="direction:rtl">🪜 پله ▸</button>
+        <div id="stairMenu" style="display:none;position:absolute;top:0;right:100%;background:#1a1a2e;border:1px solid #00ffcc44;border-radius:8px;min-width:200px;z-index:51;padding:4px 0">
+          <button class="stmi" data-t="straight">🪜 مستقیم (۲ کلیک)</button>
+          <button class="stmi" data-t="L">↱ دربست L (۳ کلیک)</button>
+          <button class="stmi" data-t="U">↷ دربست U (۳ کلیک)</button>
+          <button class="stmi" data-t="J">↴ دربست J (۳ کلیک)</button>
+          <button class="stmi" data-t="spiral">◉ مارپیچ (۱ کلیک)</button>
+        </div>
+      </div>
+      <button id="btnElev">⬛ آسانسور</button>
+      <button id="btnRail">⌒ نرده</button>
+    </div>
+  </div>
+  <div class="sep"></div>
+  <!-- سکشن ۴: مبلمان -->
+  <div class="sec-wrap">
+    <button class="tool-btn sec-btn" id="btnFurni">🛋 مبلمان ▾</button>
+    <div class="sec-drop" id="furniDrop">
+      <button class="furni" data-component="sofa2">🛋 مبل ۲نفره</button>
+      <button class="furni" data-component="sofa3">🛋 مبل ۳نفره</button>
+      <button class="furni" data-component="sofaL">🛋 مبل ال</button>
+      <button class="furni" data-component="chairD">🪑 صندلی غذا</button>
+      <button class="furni" data-component="chairO">🪑 صندلی اداری</button>
+      <button class="furni" data-component="chairA">🪑 صندلی میزبان</button>
+      <button class="furni" data-component="bed1">🛏 تخت یکنفره</button>
+      <button class="furni" data-component="bed2">🛏 تخت دونفره</button>
+      <button class="furni" data-component="bedK">🛏 تخت کودک</button>
+      <button class="furni" data-component="cabWall">🗄 کمد دیواری</button>
+      <button class="furni" data-component="cabFloor">🗄 کمد زمینی</button>
+      <button class="furni" data-component="cabWard">🗄 کمد لباس</button>
+      <button class="furni" data-component="shelfB">📚 قفسه کتاب</button>
+      <button class="furni" data-component="shelfW">📚 قفسه دیواری</button>
+      <button class="furni" data-component="mirrorW">🪞 آینه دیواری</button>
+      <button class="furni" data-component="mirrorF">🪞 آینه قدی</button>
+    </div>
+  </div>
+  <div class="sep"></div>
+  <!-- سکشن ۵: آشپزخانه و حمام -->
+  <div class="sec-wrap">
+    <button class="tool-btn sec-btn" id="btnKitchen">🍳 آشپزخانه ▾</button>
+    <div class="sec-drop" id="kitchenDrop">
+      <button class="furni" data-component="toilet">🚿 توالت</button>
+      <button class="furni" data-component="bathtub">🛁 وان</button>
+      <button class="furni" data-component="sinkB">🚰 روشویی</button>
+      <button class="furni" data-component="sinkK">🍳 سینک آشپزخانه</button>
+      <button class="furni" data-component="stove">🔥 اجاق</button>
+      <button class="furni" data-component="fridge">🧊 یخچال</button>
+    </div>
+  </div>
+  <div class="sep"></div>
+  <!-- سکشن ۶: ابزارها -->
+  <div class="sec-wrap">
+    <button class="tool-btn sec-btn" id="btnToolsSec">⚙ ابزار ▾</button>
+    <div class="sec-drop" id="toolsDrop">
+      <button id="btn3D">🖥 حالت ۳د</button>
+      <button id="btnCalib">🎯 کالیبراسیون</button>
+      <button id="btnPlanImg">🖼 عکس پلان</button>
+    </div>
+  </div>
+  <div class="sep"></div>
+  <button class="tool-btn" id="btnUndo">↩ برگشت</button>
+  <button class="tool-btn" id="btnDelete">🗑 حذف</button>
+  <div class="sep"></div>
+  <button class="tool-btn" id="btnSave">💾 ذخیره</button>
+  <button class="tool-btn" id="btnLoad">📂 بازکردن</button>
+  <div class="sep"></div>
+  <button class="tool-btn" id="btnExport">🏗 ساخت تور</button>
+  <button class="tool-btn" id="btnGLTF">⬇ GLTF</button>
